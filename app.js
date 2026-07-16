@@ -43,14 +43,23 @@ let currentRejectId = null;
 
 /* ══════════════════ INIT ══════════════════ */
 async function init() {
-  // Toon login scherm meteen als fallback — wordt verborgen als auth slaagt
+  // Toon login scherm meteen als fallback
   showLogin();
+
+  // Koppel loginknop direct — los van MSAL init
+  document.getElementById('btnLogin').addEventListener('click', () => {
+    if (msalInstance) {
+      msalInstance.loginRedirect({ scopes: GRAPH_SCOPES });
+    } else {
+      // MSAL nog niet klaar: herlaad en probeer opnieuw
+      window.location.reload();
+    }
+  });
 
   try {
     msalInstance = new msal.PublicClientApplication(msalConfig);
     await msalInstance.initialize();
 
-    // Verwerk redirect na login
     const resp = await msalInstance.handleRedirectPromise().catch(err => {
       console.warn('handleRedirectPromise fout:', err);
       return null;
@@ -61,10 +70,9 @@ async function init() {
     if (accounts.length > 0) {
       await onSignedIn(accounts[0]);
     }
-    // Anders blijft login scherm zichtbaar (al getoond hierboven)
   } catch (err) {
     console.error('MSAL init fout:', err);
-    showLogin(); // zeker tonen bij fout
+    showLogin();
   }
 }
 
@@ -235,10 +243,6 @@ function setupNavigation() {
   document.getElementById('btnLogout').addEventListener('click', async () => {
     await msalInstance.logoutPopup();
     window.location.reload();
-  });
-
-  document.getElementById('btnLogin').addEventListener('click', () => {
-    msalInstance.loginRedirect({ scopes: GRAPH_SCOPES });
   });
 }
 
