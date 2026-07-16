@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Verpa – Klachtenmeldingen</title>
+  <link rel="stylesheet" href="styles.css" />
+
+  <!-- MSAL.js -->
+  <script src="https://alcdn.msauth.net/browser/2.38.3/js/msal-browser.min.js"></script>
+  <!-- SheetJS voor Excel export -->
+  <script src="https://cdn.sheetjs.com/xlsx-0.20.2/package/dist/xlsx.full.min.js"></script>
+</head>
+<body>
+
+  <!-- ══════════════════ LOGIN SCREEN ══════════════════ -->
+  <div id="loginScreen" class="login-screen hidden">
+    <div class="login-card">
+      <div class="login-logo">
+        <div class="logo-mark">V</div>
+        <span>Verpa Benelux</span>
+      </div>
+      <h1>Klachtenmeldingen</h1>
+      <p>Meld, beheer en verwerk klachten op één centrale plek.</p>
+      <button id="btnLogin" class="btn btn-primary btn-login">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 12h6M12 9l3 3-3 3"/></svg>
+        Aanmelden met Microsoft
+      </button>
+    </div>
+  </div>
+
+  <!-- ══════════════════ MAIN APP ══════════════════ -->
+  <div id="appShell" class="app-shell hidden">
+
+    <!-- Sidebar -->
+    <aside class="sidebar">
+      <div class="sidebar-brand">
+        <div class="logo-mark">V</div>
+        <div class="brand-text">
+          <span class="brand-name">Verpa</span>
+          <span class="brand-sub">Klachten</span>
+        </div>
+      </div>
+
+      <nav class="sidebar-nav">
+        <button class="nav-item active" data-view="dashboard">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+          Dashboard
+        </button>
+        <button class="nav-item" data-view="new">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
+          Klacht indienen
+        </button>
+        <button class="nav-item admin-only hidden" data-view="review">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>
+          Te beoordelen
+          <span id="badgePending" class="badge hidden">0</span>
+        </button>
+        <button class="nav-item admin-only hidden" data-view="import">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+          Import Historisch
+        </button>
+      </nav>
+
+      <div class="sidebar-footer">
+        <div class="user-info">
+          <div class="user-avatar" id="userAvatar">?</div>
+          <div class="user-details">
+            <span id="userName" class="user-name">–</span>
+            <span id="userRole" class="user-role">–</span>
+          </div>
+        </div>
+        <button id="btnLogout" class="btn-icon" title="Afmelden">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+        </button>
+      </div>
+    </aside>
+
+    <!-- Main content -->
+    <main class="main-content">
+
+      <!-- ── DASHBOARD VIEW ── -->
+      <section id="viewDashboard" class="view active">
+        <div class="view-header">
+          <div>
+            <h2>Dashboard</h2>
+            <p class="view-subtitle" id="dashSubtitle">Overzicht van uw klachten</p>
+          </div>
+          <div class="header-actions">
+            <div class="filter-group admin-only hidden">
+              <label for="filterStatus">Status</label>
+              <select id="filterStatus">
+                <option value="">Alle statussen</option>
+                <option value="Wachtend op goedkeuring">Wachtend</option>
+                <option value="Goedgekeurd">Goedgekeurd</option>
+                <option value="Geweigerd">Geweigerd</option>
+                <option value="Geklasseerd">Geklasseerd</option>
+              </select>
+            </div>
+            <button id="btnExport" class="btn btn-secondary">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+              Excel export
+            </button>
+          </div>
+        </div>
+
+        <!-- Stats row -->
+        <div class="stats-row" id="statsRow">
+          <div class="stat-card">
+            <span class="stat-value" id="statTotal">–</span>
+            <span class="stat-label">Totaal</span>
+          </div>
+          <div class="stat-card status-pending">
+            <span class="stat-value" id="statPending">–</span>
+            <span class="stat-label">Wachtend</span>
+          </div>
+          <div class="stat-card status-approved">
+            <span class="stat-value" id="statApproved">–</span>
+            <span class="stat-label">Goedgekeurd</span>
+          </div>
+          <div class="stat-card status-rejected">
+            <span class="stat-value" id="statRejected">–</span>
+            <span class="stat-label">Geweigerd</span>
+          </div>
+        </div>
+
+        <div class="table-container">
+          <div id="loadingDash" class="loading-indicator">
+            <div class="spinner"></div> Gegevens laden…
+          </div>
+          <table id="tblKlachten" class="data-table hidden">
+            <thead>
+              <tr>
+                <th>Dossiernr</th>
+                <th>Datum</th>
+                <th>Klant</th>
+                <th>Type</th>
+                <th>Bedrag</th>
+                <th>Status</th>
+                <th>Ingediend door</th>
+                <th class="admin-only hidden">Acties</th>
+              </tr>
+            </thead>
+            <tbody id="tblBody"></tbody>
+          </table>
+          <div id="emptyState" class="empty-state hidden">
+            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+            <p>Nog geen klachten gevonden.</p>
+            <button class="btn btn-primary" data-view="new">Eerste klacht indienen</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- ── NEW COMPLAINT VIEW ── -->
+      <section id="viewNew" class="view">
+        <div class="view-header">
+          <div>
+            <h2>Klacht indienen</h2>
+            <p class="view-subtitle">Vul alle verplichte velden in</p>
+          </div>
+        </div>
+
+        <div class="form-card">
+          <div id="formSuccess" class="alert alert-success hidden">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+            <div>
+              <strong>Klacht succesvol ingediend!</strong>
+              <span id="successDossier"></span>
+            </div>
+          </div>
+          <div id="formError" class="alert alert-error hidden">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+            <span id="formErrorMsg"></span>
+          </div>
+
+          <div class="form-grid">
+            <div class="form-group">
+              <label for="fKlant">Klantnaam / Bedrijf <span class="required">*</span></label>
+              <input type="text" id="fKlant" placeholder="Naam of bedrijf van de klant" />
+            </div>
+            <div class="form-group">
+              <label for="fKlantnr">Klantnummer <span class="required">*</span></label>
+              <input type="text" id="fKlantnr" placeholder="bijv. K00123" />
+            </div>
+            <div class="form-group">
+              <label for="fFactuurnr">Oorspronkelijk Factuurnummer <span class="required">*</span></label>
+              <input type="text" id="fFactuurnr" placeholder="bijv. F2026-00456" />
+            </div>
+            <div class="form-group">
+              <label for="fType">Type Klacht <span class="required">*</span></label>
+              <select id="fType">
+                <option value="">Kies type…</option>
+                <option>Logistieke fout</option>
+                <option>Beschadiging</option>
+                <option>Prijsverschil</option>
+                <option>Administratief</option>
+                <option>Kwaliteit</option>
+              </select>
+            </div>
+            <div class="form-group form-full">
+              <label for="fOmschrijving">Omschrijving <span class="required">*</span></label>
+              <textarea id="fOmschrijving" rows="4" placeholder="Gedetailleerde uitleg van de klacht en gewenste oplossing…"></textarea>
+            </div>
+            <div class="form-group">
+              <label for="fBedrag">Bedrag (excl. BTW) <span class="required">*</span></label>
+              <div class="input-prefix">
+                <span>€</span>
+                <input type="number" id="fBedrag" min="0" step="0.01" placeholder="0,00" />
+              </div>
+            </div>
+            <div class="form-group">
+              <label for="fBijlage">Bijlagen <span class="optional">(optioneel, max 10 MB)</span></label>
+              <div class="file-drop" id="fileDrop">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                <span>Sleep bestanden hierheen of <label for="fBijlage" class="link">klik om te bladeren</label></span>
+                <input type="file" id="fBijlage" multiple accept=".jpg,.jpeg,.png,.gif,.pdf,.xlsx,.docx" style="display:none" />
+              </div>
+              <div id="fileList" class="file-list"></div>
+            </div>
+          </div>
+
+          <div class="form-actions">
+            <button id="btnSubmit" class="btn btn-primary btn-lg">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 2L11 13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+              Klacht indienen
+            </button>
+            <button class="btn btn-ghost" data-view="dashboard">Annuleren</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- ── REVIEW VIEW (ADMIN ONLY) ── -->
+      <section id="viewReview" class="view admin-only hidden">
+        <div class="view-header">
+          <div>
+            <h2>Te beoordelen klachten</h2>
+            <p class="view-subtitle">Klachten met status "Wachtend op goedkeuring"</p>
+          </div>
+        </div>
+
+        <div id="reviewList" class="review-list">
+          <div id="loadingReview" class="loading-indicator">
+            <div class="spinner"></div> Laden…
+          </div>
+          <div id="emptyReview" class="empty-state hidden">
+            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>
+            <p>Geen klachten in behandeling.</p>
+          </div>
+          <div id="reviewCards"></div>
+        </div>
+      </section>
+
+      <!-- ── IMPORT VIEW (ADMIN ONLY) ── -->
+      <section id="viewImport" class="view admin-only hidden">
+        <div class="view-header">
+          <div>
+            <h2>Historische data importeren</h2>
+            <p class="view-subtitle">Eenmalige bulkimport via Excel of CSV</p>
+          </div>
+        </div>
+
+        <div class="form-card">
+          <div class="import-instructions">
+            <h3>Vereisten voor het importbestand</h3>
+            <ul>
+              <li>Formaat: <strong>.xlsx</strong> of <strong>.csv</strong></li>
+              <li>Eerste rij bevat kolomkoppen</li>
+              <li>Verplichte kolommen: <code>Dossiernummer</code>, <code>DatumMelding</code>, <code>Klantnaam</code>, <code>Klantnummer</code>, <code>Factuurnummer</code>, <code>TypeKlacht</code>, <code>Omschrijving</code>, <code>Bedrag</code>, <code>Status</code>, <code>Melder</code></li>
+              <li>Datumformaat: <strong>DD-MM-YYYY</strong> of <strong>YYYY-MM-DD</strong></li>
+              <li>Originele dossiernummers en datums worden behouden</li>
+            </ul>
+            <a id="btnDownloadTemplate" class="btn btn-secondary" href="#">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+              Download importtemplate
+            </a>
+          </div>
+
+          <div id="importDrop" class="file-drop file-drop-lg">
+            <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+            <span>Sleep uw Excel/CSV bestand hierheen</span>
+            <label for="importFile" class="btn btn-secondary">Bestand kiezen</label>
+            <input type="file" id="importFile" accept=".xlsx,.csv" style="display:none" />
+          </div>
+
+          <div id="importPreview" class="hidden">
+            <h3>Voorbeeld (eerste 5 rijen)</h3>
+            <div class="table-container" style="margin-top:0.75rem">
+              <table id="tblImportPreview" class="data-table"></table>
+            </div>
+            <div id="importInfo" class="import-info"></div>
+            <div class="form-actions" style="margin-top:1.5rem">
+              <button id="btnImportConfirm" class="btn btn-primary">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                Import starten
+              </button>
+              <button id="btnImportCancel" class="btn btn-ghost">Annuleren</button>
+            </div>
+          </div>
+
+          <div id="importProgress" class="import-progress hidden">
+            <div class="progress-bar"><div id="progressFill" class="progress-fill"></div></div>
+            <span id="progressLabel">0 / 0 records verwerkt</span>
+          </div>
+
+          <div id="importResult" class="hidden"></div>
+        </div>
+      </section>
+
+    </main>
+  </div>
+
+  <!-- ══════════════════ MODALS ══════════════════ -->
+
+  <!-- Detail / Approve/Reject modal -->
+  <div id="modalOverlay" class="modal-overlay hidden">
+    <div class="modal">
+      <div class="modal-header">
+        <h3 id="modalTitle">Klacht beoordelen</h3>
+        <button class="btn-icon modal-close" id="modalClose">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+      <div class="modal-body" id="modalBody"></div>
+      <div class="modal-footer" id="modalFooter"></div>
+    </div>
+  </div>
+
+  <!-- Weigering reden modal -->
+  <div id="rejectOverlay" class="modal-overlay hidden">
+    <div class="modal modal-sm">
+      <div class="modal-header">
+        <h3>Reden van weigering</h3>
+        <button class="btn-icon modal-close" id="rejectClose">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+      <div class="modal-body">
+        <p style="margin-bottom:1rem;color:var(--text-muted)">Geef verplicht een reden op voor de weigering. Dit wordt zichtbaar voor de melder.</p>
+        <label for="rejectReason">Reden <span class="required">*</span></label>
+        <textarea id="rejectReason" rows="4" placeholder="Omschrijf waarom deze klacht geweigerd wordt…" style="margin-top:0.5rem"></textarea>
+        <div id="rejectError" class="alert alert-error hidden" style="margin-top:0.75rem">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+          Vul een reden in voor u de klacht weigert.
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button id="btnRejectConfirm" class="btn btn-danger">Klacht weigeren</button>
+        <button id="btnRejectCancel" class="btn btn-ghost">Annuleren</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast -->
+  <div id="toast" class="toast hidden"></div>
+
+  <script src="app.js"></script>
+</body>
+</html>
