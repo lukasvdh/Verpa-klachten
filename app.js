@@ -36,28 +36,35 @@ const msalConfig = {
 
 const GRAPH_SCOPES = ['User.Read', 'Sites.ReadWrite.All'];
 
+// MSAL v3 exporteert via window.msalBrowser, v2 via window.msal
+const msalLib = window.msalBrowser || window.msal;
+
 let msalInstance;
-let currentUser  = null;  // { name, email, isAdmin }
-let allKlachten  = [];    // lokale cache
+let currentUser  = null;
+let allKlachten  = [];
 let currentRejectId = null;
 
 /* ══════════════════ INIT ══════════════════ */
 async function init() {
-  // Toon login scherm meteen als fallback
   showLogin();
 
-  // Koppel loginknop direct — los van MSAL init
+  // Koppel loginknop direct
   document.getElementById('btnLogin').addEventListener('click', () => {
     if (msalInstance) {
       msalInstance.loginRedirect({ scopes: GRAPH_SCOPES });
     } else {
-      // MSAL nog niet klaar: herlaad en probeer opnieuw
       window.location.reload();
     }
   });
 
+  if (!msalLib) {
+    console.error('MSAL bibliotheek niet geladen.');
+    showLogin();
+    return;
+  }
+
   try {
-    msalInstance = new msal.PublicClientApplication(msalConfig);
+    msalInstance = new msalLib.PublicClientApplication(msalConfig);
     await msalInstance.initialize();
 
     const resp = await msalInstance.handleRedirectPromise().catch(err => {

@@ -6,10 +6,12 @@
   <title>Verpa – Klachtenmeldingen</title>
   <link rel="stylesheet" href="styles.css" />
 
-  <!-- MSAL.js -->
-  <script src="https://alcdn.msauth.net/browser/2.38.3/js/msal-browser.min.js"></script>
+  <!-- MSAL.js via betrouwbare CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/@azure/msal-browser@3.28.1/lib/msal-browser.min.js"></script>
   <!-- SheetJS voor Excel export -->
-  <script src="https://cdn.sheetjs.com/xlsx-0.20.2/package/dist/xlsx.full.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <!-- App logica — laadt na bovenstaande scripts -->
+  <script src="app.js" defer></script>
 </head>
 <body>
 
@@ -353,6 +355,6 @@
   <!-- Toast -->
   <div id="toast" class="toast hidden"></div>
 
-  <script src="app.js"></script>
+
 </body>
 </html>
