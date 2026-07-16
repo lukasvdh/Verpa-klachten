@@ -83,73 +83,93 @@
 
       <!-- ── DASHBOARD VIEW ── -->
       <section id="viewDashboard" class="view active">
-        <div class="view-header">
-          <div>
-            <h2>Dashboard</h2>
-            <p class="view-subtitle" id="dashSubtitle">Overzicht van uw klachten</p>
+        <div class="page-hd">
+          <h1>Waar is de klacht ontstaan?</h1>
+          <p class="view-subtitle" id="dashSubtitle">Bekijk alle ingediende klachten of maak een nieuwe melding.</p>
+        </div>
+
+        <!-- Fase kaarten -->
+        <div class="fase-grid">
+          <div class="fase-card" onclick="filterFase('Logistieke fout',this)" style="position:relative">
+            <div class="fase-arrow">&#8250;</div>
+            <div class="fc-open" id="fc1" style="background:#DBEAFE;color:#1E40AF">0 open</div>
+            <div class="fase-icon" style="background:#DBEAFE"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#1E40AF" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg></div>
+            <div class="fase-label" style="color:#1E40AF">TYPE 1</div>
+            <div class="fase-name">Logistieke fout</div>
+            <div class="fase-desc">Fout bij levering of transport</div>
+            <button class="fase-link" onclick="event.stopPropagation();navigateTo('new')">+ Klacht indienen</button>
           </div>
-          <div class="header-actions">
-            <div class="filter-group admin-only hidden">
-              <label for="filterStatus">Status</label>
-              <select id="filterStatus">
-                <option value="">Alle statussen</option>
-                <option value="Wachtend op goedkeuring">Wachtend</option>
-                <option value="Goedgekeurd">Goedgekeurd</option>
-                <option value="Geweigerd">Geweigerd</option>
-                <option value="Geklasseerd">Geklasseerd</option>
-              </select>
+          <div class="fase-card" onclick="filterFase('Beschadiging',this)" style="position:relative">
+            <div class="fase-arrow">&#8250;</div>
+            <div class="fc-open" id="fc2" style="background:#FEF3DC;color:#92400E">0 open</div>
+            <div class="fase-icon" style="background:#FEF3DC"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#B45309" stroke-width="2"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 00-2-2h-4a2 2 0 00-2 2v2"/></svg></div>
+            <div class="fase-label" style="color:#B45309">TYPE 2</div>
+            <div class="fase-name">Beschadiging</div>
+            <div class="fase-desc">Goederen beschadigd ontvangen</div>
+            <button class="fase-link" onclick="event.stopPropagation();navigateTo('new')">+ Klacht indienen</button>
+          </div>
+          <div class="fase-card" onclick="filterFase('Prijsverschil',this)" style="position:relative">
+            <div class="fase-arrow">&#8250;</div>
+            <div class="fc-open" id="fc3" style="background:#EDE9FE;color:#5B21B6">0 open</div>
+            <div class="fase-icon" style="background:#EDE9FE"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#6D28D9" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg></div>
+            <div class="fase-label" style="color:#5B21B6">TYPE 3</div>
+            <div class="fase-name">Prijsverschil</div>
+            <div class="fase-desc">Factuur klopt niet met offerte</div>
+            <button class="fase-link" onclick="event.stopPropagation();navigateTo('new')">+ Klacht indienen</button>
+          </div>
+          <div class="fase-card" onclick="filterFase('Kwaliteit',this)" style="position:relative">
+            <div class="fc-open" id="fc4" style="background:#FEE2E2;color:#991B1B">0 open</div>
+            <div class="fase-icon" style="background:#FEE2E2"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#DC2626" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></div>
+            <div class="fase-label" style="color:#991B1B">TYPE 4</div>
+            <div class="fase-name">Kwaliteit</div>
+            <div class="fase-desc">Product voldoet niet aan norm</div>
+            <button class="fase-link" onclick="event.stopPropagation();navigateTo('new')">+ Klacht indienen</button>
+          </div>
+        </div>
+
+        <!-- Lijst header -->
+        <div class="list-hd">
+          <div class="list-hd-left">
+            <span class="list-title">Meldingen</span>
+            <div class="count-dots">
+              <div class="dot-count"><div class="dot dot-blue"></div><span id="cnt-open">0 open</span></div>
+              <div class="dot-count"><div class="dot dot-red"></div><span id="cnt-hoog">0 hoog</span></div>
+              <div class="dot-count"><div class="dot dot-green"></div><span id="cnt-done">0 afgehandeld</span></div>
             </div>
-            <button id="btnExport" class="btn btn-secondary">
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-              Excel export
-            </button>
           </div>
+          <button id="btnExport" class="btn btn-secondary btn-sm">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            Excel export
+          </button>
         </div>
 
-        <!-- Stats row -->
-        <div class="stats-row" id="statsRow">
-          <div class="stat-card">
-            <span class="stat-value" id="statTotal">–</span>
-            <span class="stat-label">Totaal</span>
+        <!-- Toolbar -->
+        <div class="toolbar">
+          <div class="search-box">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            <input type="text" id="searchInput" placeholder="Zoek op dossiernr., klant, type…" oninput="loadDashboard()"/>
           </div>
-          <div class="stat-card status-pending">
-            <span class="stat-value" id="statPending">–</span>
-            <span class="stat-label">Wachtend</span>
-          </div>
-          <div class="stat-card status-approved">
-            <span class="stat-value" id="statApproved">–</span>
-            <span class="stat-label">Goedgekeurd</span>
-          </div>
-          <div class="stat-card status-rejected">
-            <span class="stat-value" id="statRejected">–</span>
-            <span class="stat-label">Geweigerd</span>
-          </div>
+          <select class="filter-sel" id="fType" onchange="loadDashboard()">
+            <option value="">Alle types</option>
+            <option>Logistieke fout</option><option>Beschadiging</option>
+            <option>Prijsverschil</option><option>Administratief</option><option>Kwaliteit</option>
+          </select>
+          <select class="filter-sel" id="fStatus" onchange="loadDashboard()">
+            <option value="">Alle statussen</option>
+            <option value="Wachtend op goedkeuring">Wachtend op goedkeuring</option>
+            <option value="Goedgekeurd">Goedgekeurd</option>
+            <option value="Geweigerd">Geweigerd</option>
+            <option value="Geklasseerd">Geklasseerd</option>
+          </select>
         </div>
 
-        <div class="table-container">
-          <div id="loadingDash" class="loading-indicator">
-            <div class="spinner"></div> Gegevens laden…
-          </div>
-          <table id="tblKlachten" class="data-table hidden">
-            <thead>
-              <tr>
-                <th>Dossiernr</th>
-                <th>Datum</th>
-                <th>Klant</th>
-                <th>Type</th>
-                <th>Bedrag</th>
-                <th>Status</th>
-                <th>Ingediend door</th>
-                <th class="admin-only hidden">Acties</th>
-              </tr>
-            </thead>
-            <tbody id="tblBody"></tbody>
-          </table>
-          <div id="emptyState" class="empty-state hidden">
-            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
-            <p>Nog geen klachten gevonden.</p>
-            <button class="btn btn-primary" data-view="new">Eerste klacht indienen</button>
-          </div>
+        <div id="loadingDash" class="loading-indicator">
+          <div class="spinner"></div> Gegevens laden…
+        </div>
+        <div class="meldingen-list" id="melding-list"></div>
+        <div id="emptyState" class="empty-state hidden">
+          <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+          <p>Nog geen klachten gevonden.</p>
         </div>
       </section>
 

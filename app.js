@@ -275,87 +275,75 @@ function capitalize(s) { return s.charAt(0).toUpperCase() + s.slice(1); }
 /* ══════════════════ DASHBOARD ══════════════════ */
 async function loadDashboard() {
   show('loadingDash');
-  hide('tblKlachten');
   hide('emptyState');
+  document.getElementById('melding-list').innerHTML = '';
 
   try {
     let filter = '';
     if (!currentUser.isAdmin) {
       filter = `fields/Melder eq '${currentUser.email}'`;
     }
-
-    // Status filter (admin)
-    const statusFilter = document.getElementById('filterStatus')?.value;
-    if (statusFilter && currentUser.isAdmin) {
-      const extra = `fields/Status eq '${statusFilter}'`;
-      filter = filter ? `${filter} and ${extra}` : extra;
-    }
-
     allKlachten = await spGetItems(filter);
-    renderDashboard(allKlachten);
+    hide('loadingDash');
+    renderList();
   } catch (e) {
     hide('loadingDash');
     showToast('Fout bij laden: ' + e.message, 'error');
   }
 }
 
-function renderDashboard(items) {
-  hide('loadingDash');
+function filterFase(type, el) {
+  document.querySelectorAll('.fase-card').forEach(function(c){c.classList.remove('active-fase');});
+  el.classList.add('active-fase');
+  document.getElementById('fType').value = type;
+  renderList();
+}
 
-  // Stats
-  document.getElementById('statTotal').textContent    = items.length;
-  document.getElementById('statPending').textContent  = items.filter(i => i.Status === 'Wachtend op goedkeuring').length;
-  document.getElementById('statApproved').textContent = items.filter(i => i.Status === 'Goedgekeurd').length;
-  document.getElementById('statRejected').textContent = items.filter(i => i.Status === 'Geweigerd').length;
+function renderList(){
+  if (!allKlachten) return;
+  updateFaseCounts();
+  var search=(document.getElementById('searchInput')?.value||'').toLowerCase();
+  var ftype=(document.getElementById('fType')?.value)||'';
+  var fstat=(document.getElementById('fStatus')?.value)||'';
+  var items=allKlachten.filter(function(k){return(!fstat||k.Status===fstat)&&(!ftype||k.TypeKlacht===ftype)&&(!search||k.Klantnaam.toLowerCase().includes(search)||k.Dossiernummer.toLowerCase().includes(search)||(k.TypeKlacht||'').toLowerCase().includes(search));});
+  var cntOpen=allKlachten.filter(function(k){return k.Status==='Wachtend op goedkeuring';}).length;
+  var cntDone=allKlachten.filter(function(k){return k.Status==='Goedgekeurd'||k.Status==='Geklasseerd';}).length;
+  if(document.getElementById('cnt-open'))document.getElementById('cnt-open').textContent=cntOpen+' open';
+  if(document.getElementById('cnt-hoog'))document.getElementById('cnt-hoog').textContent='0 hoog';
+  if(document.getElementById('cnt-done'))document.getElementById('cnt-done').textContent=cntDone+' afgehandeld';
+  const badge=document.getElementById('badgePending');
+  if(badge){badge.textContent=cntOpen;badge.classList.toggle('hidden',cntOpen===0);}
+  var el=document.getElementById('melding-list');
+  var empty=document.getElementById('emptyState');
+  if(!items.length){if(el)el.innerHTML='';if(empty)empty.classList.remove('hidden');return;}
+  if(empty)empty.classList.add('hidden');
+  el.innerHTML=items.map(function(k){
+    var sc=typeClass[k.TypeKlacht]||'';var sp=typePill[k.TypeKlacht]||'';var sb=statusBadge(k.Status);
+    var artCount=k.Artikelregels?k.Artikelregels.length:0;
+    var cnBadge=k.CreditnotaNr?'<div class="meta-item cn"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>'+k.CreditnotaNr+'</div>':'';
+    var artBadge=artCount?'<div class="meta-item"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>'+artCount+' artikel'+(artCount>1?'en':'')+'</div>':'';
+    return '<div class="melding-row '+sc+'" onclick="openDetail(\''+k.id+'\')">'
+      +'<div class="melding-body">'
+        +'<div class="melding-top"><span class="melding-nr">'+esc(k.Dossiernummer)+'</span>'+sp+'</div>'
+        +'<div class="melding-main"><span class="knr">'+esc(k.Klantnummer)+' &middot;</span>'+esc(k.Klantnaam)+'</div>'
+        +'<div class="melding-meta">'
+          +'<div class="meta-item"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>'+formatDate(k.DatumMelding)+'</div>'
+          +'<div class="meta-item"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>'+esc(k.MelderNaam||'\u2013')+'</div>'
+          +artBadge+cnBadge
+        +'</div>'
+      +'</div>'
+      +'<div class="melding-right"><span class="melding-bedrag">\u20ac '+formatBedrag(k.Bedrag)+'</span>'+sb+'</div>'
+      +'</div>';
+  }).join('');
+}
 
-  // Badge
-  const pendingCount = items.filter(i => i.Status === 'Wachtend op goedkeuring').length;
-  const badge = document.getElementById('badgePending');
-  if (pendingCount > 0 && currentUser.isAdmin) {
-    badge.textContent = pendingCount;
-    badge.classList.remove('hidden');
-  } else {
-    badge.classList.add('hidden');
-  }
-
-  if (!items.length) {
-    show('emptyState');
-    return;
-  }
-
-  const tbody = document.getElementById('tblBody');
-  tbody.innerHTML = '';
-
-  // Admin columns
-  document.querySelectorAll('.data-table .admin-only').forEach(th => {
-    th.classList.toggle('hidden', !currentUser.isAdmin);
+function updateFaseCounts(){
+  if(!allKlachten) return;
+  ['Logistieke fout','Beschadiging','Prijsverschil','Kwaliteit'].forEach(function(t,i){
+    var n=allKlachten.filter(function(k){return k.TypeKlacht===t&&k.Status==='Wachtend op goedkeuring';}).length;
+    var el=document.getElementById('fc'+(i+1));
+    if(el)el.textContent=n+' open';
   });
-
-  items.forEach(item => {
-    const tr = document.createElement('tr');
-    tr.innerHTML = `
-      <td><span class="dossier-nr">${esc(item.Dossiernummer)}</span></td>
-      <td>${formatDate(item.DatumMelding)}</td>
-      <td>${esc(item.Klantnaam)}</td>
-      <td>${esc(item.TypeKlacht)}</td>
-      <td>€ ${formatBedrag(item.Bedrag)}</td>
-      <td>${statusPill(item.Status)}</td>
-      <td>${esc(item.MelderNaam || item.Melder || '–')}</td>
-      ${currentUser.isAdmin ? `
-      <td>
-        <div style="display:flex;gap:0.4rem;align-items:center">
-          <button class="btn btn-sm btn-secondary" onclick="openDetail('${item.id}')">Detail</button>
-          ${item.Status === 'Wachtend op goedkeuring' ? `
-            <button class="btn btn-sm btn-success" onclick="approveKlacht('${item.id}')">✓ Goed</button>
-            <button class="btn btn-sm btn-danger"  onclick="openReject('${item.id}')">✗ Weiger</button>
-          ` : ''}
-        </div>
-      </td>` : '<td></td>'}
-    `;
-    tbody.appendChild(tr);
-  });
-
-  show('tblKlachten');
 }
 
 // Status filter change
@@ -467,49 +455,23 @@ async function confirmReject() {
 }
 
 /* ══════════════════ DETAIL MODAL ══════════════════ */
-function openDetail(itemId) {
-  const item = allKlachten.find(k => k.id === itemId);
-  if (!item) return;
-
-  document.getElementById('modalTitle').textContent = `Dossier ${item.Dossiernummer}`;
-
-  document.getElementById('modalBody').innerHTML = `
-    <div class="detail-grid">
-      <div><div class="detail-label">Dossiernummer</div><div class="detail-value" style="font-family:monospace;font-weight:700">${esc(item.Dossiernummer)}</div></div>
-      <div><div class="detail-label">Status</div><div class="detail-value">${statusPill(item.Status)}</div></div>
-      <div><div class="detail-label">Datum melding</div><div class="detail-value">${formatDate(item.DatumMelding)}</div></div>
-      <div><div class="detail-label">Type klacht</div><div class="detail-value">${esc(item.TypeKlacht)}</div></div>
-      <div><div class="detail-label">Klantnaam</div><div class="detail-value">${esc(item.Klantnaam)}</div></div>
-      <div><div class="detail-label">Klantnummer</div><div class="detail-value">${esc(item.Klantnummer)}</div></div>
-      <div><div class="detail-label">Factuurnummer</div><div class="detail-value">${esc(item.Factuurnummer)}</div></div>
-      <div><div class="detail-label">Bedrag (excl. BTW)</div><div class="detail-value big">€ ${formatBedrag(item.Bedrag)}</div></div>
-      <div class="detail-full"><div class="detail-label">Omschrijving</div><div class="detail-value desc">${esc(item.Omschrijving)}</div></div>
-      <div><div class="detail-label">Ingediend door</div><div class="detail-value">${esc(item.MelderNaam || item.Melder || '–')}</div></div>
-      ${item.BeoordeeldDoor ? `<div><div class="detail-label">Beoordeeld door</div><div class="detail-value">${esc(item.BeoordeeldDoor)}</div></div>` : ''}
-    </div>
-    ${item.WeigeringReden ? `
-      <div class="rejection-reason">
-        <div class="detail-label">Reden weigering</div>
-        <div class="detail-value">${esc(item.WeigeringReden)}</div>
-      </div>` : ''}
-  `;
-
-  const footer = document.getElementById('modalFooter');
-  footer.innerHTML = '';
-
-  if (currentUser.isAdmin && item.Status === 'Wachtend op goedkeuring') {
-    footer.innerHTML = `
-      <button class="btn btn-success" onclick="approveKlacht('${item.id}')">✓ Goedkeuren</button>
-      <button class="btn btn-danger"  onclick="openReject('${item.id}')">✗ Weigeren</button>
-      <button class="btn btn-ghost modal-close">Sluiten</button>
-    `;
-    footer.querySelectorAll('.modal-close').forEach(b => b.addEventListener('click', closeModal));
-  } else {
-    footer.innerHTML = `<button class="btn btn-secondary modal-close">Sluiten</button>`;
-    footer.querySelector('.modal-close').addEventListener('click', closeModal);
-  }
-
-  show('modalOverlay');
+function openDetail(id){
+  var k=klachten.find(function(x){return x.id===id;});if(!k)return;
+  document.getElementById('modal-title').textContent='Dossier '+k.Dossiernummer;
+  var artHtml='';
+  if(k.Artikelregels&&k.Artikelregels.length){
+    var rows=k.Artikelregels.map(function(r){var a=parseFloat(r.aantal)||0;var p=parseFloat(String(r.prijs||0).replace(',','.'))||0;return'<tr><td style="font-family:monospace;font-weight:700;font-size:12px;color:var(--navy)">'+(r.artnr||'\u2013')+'</td><td>'+(r.naam||'\u2013')+'</td><td><span style="background:var(--gray-bg);padding:1px 7px;border-radius:4px;font-size:11px;font-weight:600;color:var(--muted)">'+(r.uom||'ST')+'</span></td><td style="text-align:right;font-weight:600">'+a+'</td><td style="text-align:right">'+(p?'\u20ac '+fmtB(p):'\u2013')+'</td><td style="text-align:right;font-weight:600;color:var(--navy)">'+(p?'\u20ac '+fmtB(a*p):'\u2013')+'</td></tr>';}).join('');
+    var tot=k.Artikelregels.reduce(function(s,r){var a=parseFloat(r.aantal)||0;var p=parseFloat(String(r.prijs||0).replace(',','.'))||0;return s+a*p;},0);
+    artHtml='<div style="margin-bottom:16px"><div class="d-lbl" style="margin-bottom:6px">Artikelregels</div><div style="border:1px solid var(--border);border-radius:8px;overflow:hidden"><table class="art-detail-table"><thead><tr><th>Artikelnummer</th><th>Artikelnaam</th><th>UOM</th><th style="text-align:right">Aantal</th><th style="text-align:right">Eenheidsprijs</th><th style="text-align:right">Totaal</th></tr></thead><tbody>'+rows+'</tbody><tfoot><tr><td colspan="5" style="text-align:right;font-size:12px">Totaal (excl. BTW)</td><td style="text-align:right">\u20ac '+fmtB(tot)+'</td></tr></tfoot></table></div></div>';
+  } else if(k.Bedrag){artHtml='<div style="margin-bottom:16px"><div class="d-lbl" style="margin-bottom:4px">Bedrag (excl. BTW)</div><div class="d-val big">\u20ac '+fmtB(k.Bedrag)+'</div></div>';}
+  var rejectHtml=k.WeigeringReden?'<div class="reject-box"><div class="d-lbl">Reden weigering</div><div class="d-val" style="font-weight:400;margin-top:4px">'+k.WeigeringReden+'</div></div>':'';
+  var cnHtml=k.CreditnotaNr?'<div><div class="d-lbl">Creditnota</div><div class="d-val" style="font-family:monospace;font-weight:700;color:var(--green)">'+k.CreditnotaNr+'</div></div>':'';
+  document.getElementById('modal-body').innerHTML='<div class="detail-grid"><div><div class="d-lbl">Dossiernummer</div><div class="d-val" style="font-family:monospace;font-size:15px;font-weight:700;color:var(--navy)">'+k.Dossiernummer+'</div></div><div><div class="d-lbl">Status</div><div class="d-val">'+statusBadge(k.Status)+'</div></div><div><div class="d-lbl">Datum melding</div><div class="d-val">'+fmtDate(k.DatumMelding)+'</div></div><div><div class="d-lbl">Type klacht</div><div class="d-val">'+(typePill[k.TypeKlacht]||k.TypeKlacht)+'</div></div><div><div class="d-lbl">Klantnaam</div><div class="d-val">'+k.Klantnaam+'</div></div><div><div class="d-lbl">Klantnummer</div><div class="d-val">'+k.Klantnummer+'</div></div><div><div class="d-lbl">Factuurnummer</div><div class="d-val">'+k.Factuurnummer+'</div></div>'+(k.BeoordeeldDoor?'<div><div class="d-lbl">Beoordeeld door</div><div class="d-val">'+k.BeoordeeldDoor+'</div></div>':'')+cnHtml+'<div class="d-full"><div class="d-lbl">Omschrijving</div><div class="d-val desc">'+k.Omschrijving+'</div></div><div><div class="d-lbl">Ingediend door</div><div class="d-val">'+(k.MelderNaam||'\u2013')+'</div></div></div>'+artHtml+rejectHtml;
+  var foot=document.getElementById('modal-foot');
+  if(k.Status==='Wachtend op goedkeuring'){foot.innerHTML='<button class="btn btn-success" onclick="approve(\''+k.id+'\')">&#10003; Goedkeuren</button><button class="btn btn-danger" onclick="openRejectModal(\''+k.id+'\')">&#10007; Weigeren</button><button class="btn btn-ghost" onclick="closeModal()">Sluiten</button>';}
+  else if(k.Status==='Goedgekeurd'){foot.innerHTML='<div style="display:flex;align-items:center;gap:8px;flex:1;flex-wrap:wrap"><div style="display:flex;align-items:center;border:1.5px solid var(--border);border-radius:8px;overflow:hidden;background:var(--surface)"><span style="padding:6px 10px;background:var(--gray-bg);color:var(--muted);font-size:12px;font-weight:600;border-right:1px solid var(--border);white-space:nowrap">Creditnota</span><input id="creditnota-input" type="text" placeholder="bijv. CN2026-00123 (optioneel)" value="'+(k.CreditnotaNr||'')+'" style="border:none;padding:6px 10px;font-size:13px;color:var(--text);outline:none;width:220px;font-family:monospace;font-weight:600"/></div><button class="btn btn-success btn-sm" onclick="saveCreditnota(\''+k.id+'\')">Opslaan</button></div><button class="btn btn-ghost" onclick="closeModal()">Sluiten</button>';}
+  else{foot.innerHTML='<button class="btn" onclick="closeModal()">Sluiten</button>';}
+  document.getElementById('modal-overlay').classList.remove('hidden');
 }
 
 function setupModals() {
