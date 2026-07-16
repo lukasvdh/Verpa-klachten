@@ -43,18 +43,28 @@ let currentRejectId = null;
 
 /* ══════════════════ INIT ══════════════════ */
 async function init() {
-  msalInstance = new msal.PublicClientApplication(msalConfig);
-  await msalInstance.initialize();
+  // Toon login scherm meteen als fallback — wordt verborgen als auth slaagt
+  showLogin();
 
-  // Verwerk redirect na login
-  const resp = await msalInstance.handleRedirectPromise().catch(console.error);
-  if (resp) { await onSignedIn(resp.account); return; }
+  try {
+    msalInstance = new msal.PublicClientApplication(msalConfig);
+    await msalInstance.initialize();
 
-  const accounts = msalInstance.getAllAccounts();
-  if (accounts.length > 0) {
-    await onSignedIn(accounts[0]);
-  } else {
-    showLogin();
+    // Verwerk redirect na login
+    const resp = await msalInstance.handleRedirectPromise().catch(err => {
+      console.warn('handleRedirectPromise fout:', err);
+      return null;
+    });
+    if (resp && resp.account) { await onSignedIn(resp.account); return; }
+
+    const accounts = msalInstance.getAllAccounts();
+    if (accounts.length > 0) {
+      await onSignedIn(accounts[0]);
+    }
+    // Anders blijft login scherm zichtbaar (al getoond hierboven)
+  } catch (err) {
+    console.error('MSAL init fout:', err);
+    showLogin(); // zeker tonen bij fout
   }
 }
 
@@ -64,6 +74,8 @@ function showLogin() {
 }
 
 async function onSignedIn(account) {
+  // Verberg login scherm zodra we een account hebben
+  document.getElementById('loginScreen').classList.add('hidden');
   const token = await getToken(account);
   if (!token) { showLogin(); return; }
 
