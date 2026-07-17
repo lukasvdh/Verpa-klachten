@@ -318,6 +318,34 @@ function filterFase(type, el) {
   renderList();
 }
 
+/* ══════════════════ RENDER HELPERS ══════════════════ */
+const typeClass = {
+  'Foute bestelling': 'fase-ontvangst',
+  'Beschadiging':     'fase-voorraad',
+  'Prijsverschil':    'fase-verzending',
+  'Administratief':   'fase-admin',
+  'Kwaliteit':        'fase-levering',
+};
+
+const typePill = {
+  'Foute bestelling': '<span class="fase-pill fp-ontvangst">Foute bestelling</span>',
+  'Beschadiging':     '<span class="fase-pill fp-voorraad">Beschadiging</span>',
+  'Prijsverschil':    '<span class="fase-pill fp-verzending">Prijsverschil</span>',
+  'Administratief':   '<span class="fase-pill fp-admin">Administratief</span>',
+  'Kwaliteit':        '<span class="fase-pill fp-levering">Kwaliteit</span>',
+};
+
+function statusBadge(status) {
+  const map = {
+    'Wachtend op goedkeuring': 's-wachtend',
+    'Goedgekeurd':             's-goedgekeurd',
+    'Geweigerd':               's-geweigerd',
+    'Geklasseerd':             's-geklasseerd',
+  };
+  const cls = map[status] || 's-geklasseerd';
+  return `<span class="status-badge ${cls}"><span class="sb-dot"></span>${esc(status)}</span>`;
+}
+
 function renderList(){
   if (!allKlachten) return;
   updateFaseCounts();
@@ -338,7 +366,7 @@ function renderList(){
   if(empty)empty.classList.add('hidden');
   el.innerHTML=items.map(function(k){
     var sc=typeClass[k.TypeKlacht]||'';var sp=typePill[k.TypeKlacht]||'';var sb=statusBadge(k.Status);
-    var artCount=k.Artikelregels?k.Artikelregels.length:0;
+    var artCount=0;try{if(k.Artikelregels){var _ar=JSON.parse(k.Artikelregels);artCount=_ar.filter(function(r){return r.artnr||r.naam;}).length;}}catch(e){}
     var cnBadge=k.CreditnotaNr?'<div class="meta-item cn"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>'+k.CreditnotaNr+'</div>':'';
     var artBadge=artCount?'<div class="meta-item"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>'+artCount+' artikel'+(artCount>1?'en':'')+'</div>':'';
     return '<div class="melding-row '+sc+'" onclick="openDetail(\''+k.id+'\')">'
