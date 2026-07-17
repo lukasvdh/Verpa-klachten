@@ -35,7 +35,7 @@ const msalConfig = {
   cache: { cacheLocation: 'sessionStorage', storeAuthStateInCookie: false },
 };
 
-const GRAPH_SCOPES = ['User.Read', 'Sites.ReadWrite.All', 'GroupMember.Read.All'];
+const GRAPH_SCOPES = ['User.Read', 'Sites.ReadWrite.All'];
 
 // MSAL v3 exporteert via window.msalBrowser, v2 via window.msal
 const msalLib = window.msalBrowser || window.msal;
@@ -99,20 +99,18 @@ async function onSignedIn(account) {
   const profile = await graphGet('/me', token);
   const email = (profile.mail || profile.userPrincipalName || '').toLowerCase();
 
-  // Check groepslidmaatschap via Entra
+  // Check app-rol toewijzing via Entra
   let isAdmin = false;
   try {
-    const groupCheck = await fetch('https://graph.microsoft.com/v1.0/me/checkMemberOf', {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ groupIds: [CONFIG.adminGroupId] }),
+    const roleResp = await fetch('https://graph.microsoft.com/v1.0/me/appRoleAssignments', {
+      headers: { Authorization: `Bearer ${token}` },
     });
-    if (groupCheck.ok) {
-      const groupData = await groupCheck.json();
-      isAdmin = Array.isArray(groupData.value) && groupData.value.includes(CONFIG.adminGroupId);
+    if (roleResp.ok) {
+      const roleData = await roleResp.json();
+      isAdmin = roleData.value.some(r => r.appRoleId === CONFIG.adminRoleId);
     }
   } catch (e) {
-    console.warn('Admin groepscheck mislukt:', e);
+    console.warn('Admin rolcheck mislukt:', e);
   }
 
   currentUser = {
@@ -242,19 +240,31 @@ async function spUpdateItem(itemId, fields) {
 /* ══════════════════ DOSSIERNUMMER LOGICA ══════════════════ */
 async function generateDossierNumber() {
   const year = new Date().getFullYear();
-  // Haal hoogste volgnummer op van dit jaar
-  const filter = `fields/Dossiernummer ge '${year}-0000' and fields/Dossiernummer le '${year}-9999'`;
+  const prefix = `${year}-`;
+
+  // Haal alle items op met startswith filter (Graph ondersteunt geen ge/le op tekst)
   let items = [];
-  try { items = await spGetItems(filter, 'fields/Dossiernummer desc'); } catch {}
+  try {
+    items = await spGetItems(
+      `startswith(fields/Dossiernummer,'${prefix}')`,
+      'fields/Dossiernummer desc'
+    );
+  } catch {}
 
   let seq = 1;
   if (items.length > 0) {
-    const last = items[0].Dossiernummer || '';
-    const parts = last.split('-');
-    const lastSeq = parseInt(parts[parts.length - 1], 10);
-    if (!isNaN(lastSeq)) seq = lastSeq + 1;
+    // Zoek het hoogste volgnummer manueel (sortering op tekst kan fout gaan)
+    let max = 0;
+    items.forEach(item => {
+      const nr = item.Dossiernummer || '';
+      if (nr.startsWith(prefix)) {
+        const n = parseInt(nr.slice(prefix.length), 10);
+        if (!isNaN(n) && n > max) max = n;
+      }
+    });
+    seq = max + 1;
   }
-  return `${year}-${String(seq).padStart(4, '0')}`;
+  return `${prefix}${String(seq).padStart(4, '0')}`;
 }
 
 /* ══════════════════ NAVIGATION ══════════════════ */
