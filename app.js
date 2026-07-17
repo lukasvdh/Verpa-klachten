@@ -158,7 +158,10 @@ async function refreshToken() {
 /* ══════════════════ GRAPH / SHAREPOINT HELPERS ══════════════════ */
 async function graphGet(path, token) {
   const r = await fetch(`https://graph.microsoft.com/v1.0${path}`, {
-    headers: { Authorization: `Bearer ${token}` },
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Prefer': 'HonorNonIndexedQueriesWarningMayFailRandomly',
+    },
   });
   if (!r.ok) throw new Error(`Graph GET ${path}: ${r.status}`);
   return r.json();
