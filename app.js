@@ -502,23 +502,26 @@ async function confirmReject() {
 }
 
 /* ══════════════════ DETAIL MODAL ══════════════════ */
+function fmtB(n){return parseFloat(n).toLocaleString('nl-BE',{minimumFractionDigits:2,maximumFractionDigits:2});}
+function fmtDate(iso){return formatDate(iso);}
 function openDetail(id){
-  var k=klachten.find(function(x){return x.id===id;});if(!k)return;
-  document.getElementById('modal-title').textContent='Dossier '+k.Dossiernummer;
+  var k=allKlachten.find(function(x){return x.id===id;});if(!k)return;
+  document.getElementById('modalTitle').textContent='Dossier '+k.Dossiernummer;
   var artHtml='';
-  if(k.Artikelregels&&k.Artikelregels.length){
-    var rows=k.Artikelregels.map(function(r){var a=parseFloat(r.aantal)||0;var p=parseFloat(String(r.prijs||0).replace(',','.'))||0;return'<tr><td style="font-family:monospace;font-weight:700;font-size:12px;color:var(--navy)">'+(r.artnr||'\u2013')+'</td><td>'+(r.naam||'\u2013')+'</td><td><span style="background:var(--gray-bg);padding:1px 7px;border-radius:4px;font-size:11px;font-weight:600;color:var(--muted)">'+(r.uom||'ST')+'</span></td><td style="text-align:right;font-weight:600">'+a+'</td><td style="text-align:right">'+(p?'\u20ac '+fmtB(p):'\u2013')+'</td><td style="text-align:right;font-weight:600;color:var(--navy)">'+(p?'\u20ac '+fmtB(a*p):'\u2013')+'</td></tr>';}).join('');
-    var tot=k.Artikelregels.reduce(function(s,r){var a=parseFloat(r.aantal)||0;var p=parseFloat(String(r.prijs||0).replace(',','.'))||0;return s+a*p;},0);
+  var _artParsed=[];try{if(k.Artikelregels)_artParsed=JSON.parse(k.Artikelregels).filter(function(r){return r.artnr||r.naam;});}catch(e){}
+  if(_artParsed.length){
+    var rows=_artParsed.map(function(r){var a=parseFloat(r.aantal)||0;var p=parseFloat(String(r.prijs||0).replace(',','.'))||0;return'<tr><td style="font-family:monospace;font-weight:700;font-size:12px;color:var(--navy)">'+(r.artnr||'\u2013')+'</td><td>'+(r.naam||'\u2013')+'</td><td><span style="background:var(--gray-bg);padding:1px 7px;border-radius:4px;font-size:11px;font-weight:600;color:var(--muted)">'+(r.uom||'ST')+'</span></td><td style="text-align:right;font-weight:600">'+a+'</td><td style="text-align:right">'+(p?'\u20ac '+fmtB(p):'\u2013')+'</td><td style="text-align:right;font-weight:600;color:var(--navy)">'+(p?'\u20ac '+fmtB(a*p):'\u2013')+'</td></tr>';}).join('');
+    var tot=_artParsed.reduce(function(s,r){var a=parseFloat(r.aantal)||0;var p=parseFloat(String(r.prijs||0).replace(',','.'))||0;return s+a*p;},0);
     artHtml='<div style="margin-bottom:16px"><div class="d-lbl" style="margin-bottom:6px">Artikelregels</div><div style="border:1px solid var(--border);border-radius:8px;overflow:hidden"><table class="art-detail-table"><thead><tr><th>Artikelnummer</th><th>Artikelnaam</th><th>UOM</th><th style="text-align:right">Aantal</th><th style="text-align:right">Eenheidsprijs</th><th style="text-align:right">Totaal</th></tr></thead><tbody>'+rows+'</tbody><tfoot><tr><td colspan="5" style="text-align:right;font-size:12px">Totaal (excl. BTW)</td><td style="text-align:right">\u20ac '+fmtB(tot)+'</td></tr></tfoot></table></div></div>';
   } else if(k.Bedrag){artHtml='<div style="margin-bottom:16px"><div class="d-lbl" style="margin-bottom:4px">Bedrag (excl. BTW)</div><div class="d-val big">\u20ac '+fmtB(k.Bedrag)+'</div></div>';}
   var rejectHtml=k.WeigeringReden?'<div class="reject-box"><div class="d-lbl">Reden weigering</div><div class="d-val" style="font-weight:400;margin-top:4px">'+k.WeigeringReden+'</div></div>':'';
   var cnHtml=k.CreditnotaNr?'<div><div class="d-lbl">Creditnota</div><div class="d-val" style="font-family:monospace;font-weight:700;color:var(--green)">'+k.CreditnotaNr+'</div></div>':'';
-  document.getElementById('modal-body').innerHTML='<div class="detail-grid"><div><div class="d-lbl">Dossiernummer</div><div class="d-val" style="font-family:monospace;font-size:15px;font-weight:700;color:var(--navy)">'+k.Dossiernummer+'</div></div><div><div class="d-lbl">Status</div><div class="d-val">'+statusBadge(k.Status)+'</div></div><div><div class="d-lbl">Datum melding</div><div class="d-val">'+fmtDate(k.DatumMelding)+'</div></div><div><div class="d-lbl">Type klacht</div><div class="d-val">'+(typePill[k.TypeKlacht]||k.TypeKlacht)+'</div></div><div><div class="d-lbl">Klantnaam</div><div class="d-val">'+k.Klantnaam+'</div></div><div><div class="d-lbl">Klantnummer</div><div class="d-val">'+k.Klantnummer+'</div></div><div><div class="d-lbl">Factuurnummer</div><div class="d-val">'+k.Factuurnummer+'</div></div>'+(k.BeoordeeldDoor?'<div><div class="d-lbl">Beoordeeld door</div><div class="d-val">'+k.BeoordeeldDoor+'</div></div>':'')+cnHtml+'<div class="d-full"><div class="d-lbl">Omschrijving</div><div class="d-val desc">'+k.Omschrijving+'</div></div><div><div class="d-lbl">Ingediend door</div><div class="d-val">'+(k.MelderNaam||'\u2013')+'</div></div></div>'+artHtml+rejectHtml;
-  var foot=document.getElementById('modal-foot');
-  if(k.Status==='Wachtend op goedkeuring'){foot.innerHTML='<button class="btn btn-success" onclick="approve(\''+k.id+'\')">&#10003; Goedkeuren</button><button class="btn btn-danger" onclick="openRejectModal(\''+k.id+'\')">&#10007; Weigeren</button><button class="btn btn-ghost" onclick="closeModal()">Sluiten</button>';}
+  document.getElementById('modalBody').innerHTML='<div class="detail-grid"><div><div class="d-lbl">Dossiernummer</div><div class="d-val" style="font-family:monospace;font-size:15px;font-weight:700;color:var(--navy)">'+k.Dossiernummer+'</div></div><div><div class="d-lbl">Status</div><div class="d-val">'+statusBadge(k.Status)+'</div></div><div><div class="d-lbl">Datum melding</div><div class="d-val">'+fmtDate(k.DatumMelding)+'</div></div><div><div class="d-lbl">Type klacht</div><div class="d-val">'+(typePill[k.TypeKlacht]||k.TypeKlacht)+'</div></div><div><div class="d-lbl">Klantnaam</div><div class="d-val">'+k.Klantnaam+'</div></div><div><div class="d-lbl">Klantnummer</div><div class="d-val">'+k.Klantnummer+'</div></div><div><div class="d-lbl">Factuurnummer</div><div class="d-val">'+k.Factuurnummer+'</div></div>'+(k.BeoordeeldDoor?'<div><div class="d-lbl">Beoordeeld door</div><div class="d-val">'+k.BeoordeeldDoor+'</div></div>':'')+cnHtml+'<div class="d-full"><div class="d-lbl">Omschrijving</div><div class="d-val desc">'+k.Omschrijving+'</div></div><div><div class="d-lbl">Ingediend door</div><div class="d-val">'+(k.MelderNaam||'\u2013')+'</div></div></div>'+artHtml+rejectHtml;
+  var foot=document.getElementById('modalFooter');
+  if(k.Status==='Wachtend op goedkeuring'){foot.innerHTML='<button class="btn btn-success" onclick="approveKlacht(\''+k.id+'\')">&#10003; Goedkeuren</button><button class="btn btn-danger" onclick="openReject(\''+k.id+'\')">&#10007; Weigeren</button><button class="btn btn-ghost" onclick="closeModal()">Sluiten</button>';}
   else if(k.Status==='Goedgekeurd'){foot.innerHTML='<div style="display:flex;align-items:center;gap:8px;flex:1;flex-wrap:wrap"><div style="display:flex;align-items:center;border:1.5px solid var(--border);border-radius:8px;overflow:hidden;background:var(--surface)"><span style="padding:6px 10px;background:var(--gray-bg);color:var(--muted);font-size:12px;font-weight:600;border-right:1px solid var(--border);white-space:nowrap">Creditnota</span><input id="creditnota-input" type="text" placeholder="bijv. CN2026-00123 (optioneel)" value="'+(k.CreditnotaNr||'')+'" style="border:none;padding:6px 10px;font-size:13px;color:var(--text);outline:none;width:220px;font-family:monospace;font-weight:600"/></div><button class="btn btn-success btn-sm" onclick="saveCreditnota(\''+k.id+'\')">Opslaan</button></div><button class="btn btn-ghost" onclick="closeModal()">Sluiten</button>';}
   else{foot.innerHTML='<button class="btn" onclick="closeModal()">Sluiten</button>';}
-  document.getElementById('modal-overlay').classList.remove('hidden');
+  document.getElementById('modalOverlay').classList.remove('hidden');
 }
 
 function setupModals() {
@@ -537,6 +540,18 @@ function setupModals() {
 }
 
 function closeModal() { hide('modalOverlay'); }
+
+async function saveCreditnota(itemId) {
+  const val = document.getElementById('creditnota-input')?.value.trim();
+  try {
+    await spUpdateItem(itemId, { CreditnotaNr: val });
+    showToast('Creditnota opgeslagen.', 'success');
+    closeModal();
+    await loadDashboard();
+  } catch(e) {
+    showToast('Fout bij opslaan: ' + e.message, 'error');
+  }
+}
 
 /* ══════════════════ FORM ══════════════════ */
 let selectedFiles = [];
