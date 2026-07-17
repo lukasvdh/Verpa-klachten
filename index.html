@@ -34,21 +34,33 @@ button,input,select,textarea{font-family:inherit;font-size:13.5px}
 .login-card p{color:var(--muted);margin-bottom:2rem;line-height:1.6}
 .btn-login{width:100%;gap:.5rem;justify-content:center;padding:.85rem;font-size:.95rem}
 /* ── APP SHELL ── */
-.app-shell{display:flex;flex-direction:column;min-height:100vh}background:var(--surface);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 24px;gap:16px;position:sticky;top:0;z-index:50}
-.topbar-logo{width:32px;height:32px;background:linear-gradient(135deg,var(--navy),var(--navy2));border-radius:9px;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:800;font-size:14px;flex-shrink:0}
-.topbar-title{font-size:14px;font-weight:700;color:var(--text)}
-.topbar-sub{font-size:12px;color:var(--muted);margin-left:4px}
-.topbar-nav{display:flex;gap:2px;margin-left:28px;flex:1}
-.tn{padding:6px 14px;border-radius:7px;border:none;background:none;color:var(--muted);cursor:pointer;font-size:13px;font-weight:500;transition:.12s}
-.tn:hover{background:var(--gray-bg);color:var(--text)}
-.tn.active{background:var(--navy-bg);color:var(--navy);font-weight:600}
-.topbar-right{display:flex;align-items:center;gap:10px;margin-left:auto}
-.role-badge{background:var(--navy);color:#fff;font-size:11px;font-weight:700;padding:3px 10px;border-radius:20px}
-.topbar-user{font-size:13px;font-weight:600;color:var(--text)}
-.btn-icon{background:none;border:none;cursor:pointer;color:var(--muted);padding:5px;border-radius:6px;display:flex;align-items:center;transition:.12s}
-.btn-icon:hover{background:var(--gray-bg);color:var(--text)}
-.demo-strip{background:var(--amber);color:#78350F;text-align:center;padding:5px;font-size:11px;font-weight:700;letter-spacing:.04em}
-.demo-strip span{font-weight:400;opacity:.8;margin-left:6px}
+.app-shell{display:flex;height:100vh;overflow:hidden}
+
+/* ── SIDEBAR ── */
+.sidebar{width:220px;flex-shrink:0;background:var(--navy);display:flex;flex-direction:column;height:100vh;overflow:hidden}
+.sidebar-brand{display:flex;align-items:center;gap:10px;padding:20px 16px 18px;border-bottom:1px solid rgba(255,255,255,.1)}
+.brand-text{display:flex;flex-direction:column}
+.brand-name{font-size:14px;font-weight:700;color:#fff;line-height:1.2}
+.brand-sub{font-size:11px;color:rgba(255,255,255,.5);line-height:1.2}
+.sidebar .logo-mark{background:rgba(255,255,255,.15);color:#fff;flex-shrink:0}
+.sidebar-nav{flex:1;padding:12px 8px;display:flex;flex-direction:column;gap:2px;overflow-y:auto}
+.nav-item{display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:8px;border:none;background:none;color:rgba(255,255,255,.65);cursor:pointer;font-size:13px;font-weight:500;text-align:left;width:100%;transition:.12s;position:relative}
+.nav-item:hover{background:rgba(255,255,255,.1);color:#fff}
+.nav-item.active{background:rgba(255,255,255,.15);color:#fff;font-weight:600}
+.nav-item svg{flex-shrink:0;opacity:.8}
+.nav-item.active svg{opacity:1}
+.badge{background:#EF4444;color:#fff;font-size:10px;font-weight:700;padding:1px 6px;border-radius:10px;margin-left:auto}
+.sidebar-footer{padding:12px 8px 16px;border-top:1px solid rgba(255,255,255,.1)}
+.user-info{display:flex;align-items:center;gap:9px;padding:8px;border-radius:8px}
+.user-avatar{width:32px;height:32px;border-radius:50%;background:rgba(255,255,255,.2);color:#fff;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;flex-shrink:0}
+.user-details{display:flex;flex-direction:column;flex:1;min-width:0}
+.user-name{font-size:12px;font-weight:600;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.user-role{font-size:11px;color:rgba(255,255,255,.5)}
+.btn-icon{background:none;border:none;cursor:pointer;color:rgba(255,255,255,.5);padding:5px;border-radius:6px;display:flex;align-items:center;transition:.12s;flex-shrink:0}
+.btn-icon:hover{background:rgba(255,255,255,.1);color:#fff}
+
+/* ── MAIN CONTENT ── */
+.main-content{flex:1;overflow-y:auto;background:var(--bg)}
 .view{display:none;padding:28px 32px;max-width:1100px;margin:0 auto}
 .view.active{display:block}
 .page-hd{margin-bottom:24px}

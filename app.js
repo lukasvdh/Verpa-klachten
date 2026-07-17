@@ -8,6 +8,7 @@
    Vereiste Graph permissies (Delegated):
      - Sites.ReadWrite.All  (of Sites.Manage.All)
      - User.Read
+     - GroupMember.Read.All  (voor admin-groep check)
    SharePoint List: "KlachtenMeldingen" met onderstaande kolommen.
    ─────────────────────────────────────────────────── */
 const CONFIG = {
@@ -19,8 +20,9 @@ const CONFIG = {
   spSiteUrl:   'https://verpabenelux.sharepoint.com/sites/OfficeData',
   spListName:  'KlachtenMeldingen',
 
-  // UPN's van beheerder(s) – kleine letters
-  adminUsers: ['ils@verpa.be'],
+  // Object-ID van de Entra-groep waarvan leden als beheerder gelden
+  // Stel in via Entra ID → Groups → jouw beheerdersgroep → Object ID
+  adminGroupId: 'JOUW_ENTRA_GROEP_OBJECT_ID',
 };
 
 /* ─────────────────────────────────────────────────── */
@@ -34,7 +36,7 @@ const msalConfig = {
   cache: { cacheLocation: 'sessionStorage', storeAuthStateInCookie: false },
 };
 
-const GRAPH_SCOPES = ['User.Read', 'Sites.ReadWrite.All'];
+const GRAPH_SCOPES = ['User.Read', 'Sites.ReadWrite.All', 'GroupMember.Read.All'];
 
 // MSAL v3 exporteert via window.msalBrowser, v2 via window.msal
 const msalLib = window.msalBrowser || window.msal;
@@ -98,10 +100,26 @@ async function onSignedIn(account) {
   const profile = await graphGet('/me', token);
   const email = (profile.mail || profile.userPrincipalName || '').toLowerCase();
 
+  // Check groepslidmaatschap via Entra
+  let isAdmin = false;
+  try {
+    const groupCheck = await fetch('https://graph.microsoft.com/v1.0/me/checkMemberOf', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ groupIds: [CONFIG.adminGroupId] }),
+    });
+    if (groupCheck.ok) {
+      const groupData = await groupCheck.json();
+      isAdmin = Array.isArray(groupData.value) && groupData.value.includes(CONFIG.adminGroupId);
+    }
+  } catch (e) {
+    console.warn('Admin groepscheck mislukt:', e);
+  }
+
   currentUser = {
     name:    profile.displayName || account.name || 'Gebruiker',
     email,
-    isAdmin: CONFIG.adminUsers.includes(email),
+    isAdmin,
     token,
   };
 
