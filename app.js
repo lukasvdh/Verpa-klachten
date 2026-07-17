@@ -8,7 +8,6 @@
    Vereiste Graph permissies (Delegated):
      - Sites.ReadWrite.All  (of Sites.Manage.All)
      - User.Read
-     - GroupMember.Read.All  (voor admin-groep check)
    SharePoint List: "KlachtenMeldingen" met onderstaande kolommen.
    ─────────────────────────────────────────────────── */
 const CONFIG = {
@@ -20,8 +19,8 @@ const CONFIG = {
   spSiteUrl:   'https://verpabenelux.sharepoint.com/sites/OfficeData',
   spListName:  'KlachtenMeldingen',
 
+  // UPN's van beheerder(s) – kleine letters
   // Object-ID van de Entra-groep waarvan leden als beheerder gelden
-  // Stel in via Entra ID → Groups → jouw beheerdersgroep → Object ID
   adminGroupId: 'JOUW_ENTRA_GROEP_OBJECT_ID',
 };
 
@@ -128,7 +127,6 @@ async function onSignedIn(account) {
   document.getElementById('appShell').classList.remove('hidden');
   document.getElementById('userName').textContent   = currentUser.name.split(' ')[0];
   document.getElementById('userRole').textContent   = currentUser.isAdmin ? 'Beheerder' : 'Melder';
-  document.getElementById('userAvatar').textContent = currentUser.name.charAt(0).toUpperCase();
   document.getElementById('dashSubtitle').textContent =
     currentUser.isAdmin ? 'Alle ingediende klachten' : 'Uw ingediende klachten';
 
@@ -278,7 +276,7 @@ function navigateTo(view) {
   if (target) target.classList.add('active');
 
   // Nav items
-  document.querySelectorAll('.nav-item').forEach(n => {
+  document.querySelectorAll('.tn').forEach(n => {
     n.classList.toggle('active', n.dataset.view === view);
   });
 
