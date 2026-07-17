@@ -339,7 +339,7 @@ function renderList(){
 
 function updateFaseCounts(){
   if(!allKlachten) return;
-  ['Logistieke fout','Beschadiging','Prijsverschil','Kwaliteit'].forEach(function(t,i){
+  ['Foute bestelling','Beschadiging','Prijsverschil','Kwaliteit'].forEach(function(t,i){
     var n=allKlachten.filter(function(k){return k.TypeKlacht===t&&k.Status==='Wachtend op goedkeuring';}).length;
     var el=document.getElementById('fc'+(i+1));
     if(el)el.textContent=n+' open';

@@ -363,12 +363,12 @@ button,input,select,textarea{font-family:inherit;font-size:13.5px}
 
         <!-- Fase kaarten -->
         <div class="fase-grid">
-          <div class="fase-card" onclick="filterFase('Logistieke fout',this)" style="position:relative">
+          <div class="fase-card" onclick="filterFase('Foute bestelling',this)" style="position:relative">
             <div class="fase-arrow">&#8250;</div>
             <div class="fc-open" id="fc1" style="background:#DBEAFE;color:#1E40AF">0 open</div>
             <div class="fase-icon" style="background:#DBEAFE"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#1E40AF" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg></div>
             <div class="fase-label" style="color:#1E40AF">TYPE 1</div>
-            <div class="fase-name">Logistieke fout</div>
+            <div class="fase-name">Foute bestelling</div>
             <div class="fase-desc">Fout bij levering of transport</div>
             <button class="fase-link" onclick="event.stopPropagation();navigateTo('new')">+ Klacht indienen</button>
           </div>
@@ -424,7 +424,7 @@ button,input,select,textarea{font-family:inherit;font-size:13.5px}
           </div>
           <select class="filter-sel" id="fType" onchange="loadDashboard()">
             <option value="">Alle types</option>
-            <option>Logistieke fout</option><option>Beschadiging</option>
+            <option>Foute bestelling</option><option>Beschadiging</option>
             <option>Prijsverschil</option><option>Administratief</option><option>Kwaliteit</option>
           </select>
           <select class="filter-sel" id="fStatus" onchange="loadDashboard()">
@@ -485,7 +485,7 @@ button,input,select,textarea{font-family:inherit;font-size:13.5px}
               <label for="fType">Type Klacht <span class="required">*</span></label>
               <select id="fType">
                 <option value="">Kies type…</option>
-                <option>Logistieke fout</option>
+                <option>Foute bestelling</option>
                 <option>Beschadiging</option>
                 <option>Prijsverschil</option>
                 <option>Administratief</option>
