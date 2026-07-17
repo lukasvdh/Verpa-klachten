@@ -443,6 +443,85 @@ button,input,select,textarea{font-family:inherit;font-size:13.5px}
 @media (max-width: 400px) {
   .fase-grid { grid-template-columns: 1fr; }
 }
+
+@media (max-width: 768px) {
+
+  /* Modal als full bottom sheet */
+  .modal-overlay { align-items: flex-end; padding: 0; }
+  .modal-box {
+    border-radius: 20px 20px 0 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    max-height: 92vh;
+    display: flex;
+    flex-direction: column;
+  }
+  .modal-header { flex-shrink: 0; padding: 16px 18px; }
+  .modal-body {
+    flex: 1;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    padding: 16px 18px;
+  }
+  .modal-footer {
+    flex-shrink: 0;
+    flex-direction: column;
+    gap: 8px;
+    padding: 12px 16px calc(12px + env(safe-area-inset-bottom));
+    border-top: 1px solid var(--border);
+    background: var(--surface);
+  }
+  .modal-footer .btn {
+    width: 100%;
+    justify-content: center;
+    padding: 11px 16px;
+    font-size: 14px;
+  }
+  /* Verwijderen altijd onderaan en vol breed */
+  .modal-footer .btn-danger:last-child {
+    margin-left: 0 !important;
+    order: 99;
+  }
+  /* Retourkaart knop */
+  .modal-footer .btn-secondary {
+    order: 10;
+  }
+
+  /* Detail grid in modal */
+  .detail-grid {
+    grid-template-columns: 1fr 1fr !important;
+    gap: 12px 16px;
+  }
+
+  /* Artikelregels tabel in modal: verberg eenheidsprijs, toon totaal per rij */
+  .art-detail-table { font-size: 12px; }
+  .art-detail-table .col-prijs { display: none; }
+  .art-detail-table .col-uom { display: none; }
+  .art-detail-table th, .art-detail-table td { padding: 6px 8px; }
+
+  /* Creditnota veld in footer */
+  .modal-footer > div:first-child {
+    width: 100%;
+    flex-wrap: wrap;
+  }
+  .modal-footer > div:first-child input {
+    width: 100% !important;
+    min-width: 0;
+  }
+}
+
+@media (max-width: 480px) {
+  /* Verberg Eenheidsprijs kolom in detail modal op klein scherm */
+  .art-detail-table th:nth-child(5),
+  .art-detail-table td:nth-child(5) { display: none; }
+  /* Verberg UOM op heel klein scherm */
+  .art-detail-table th:nth-child(3),
+  .art-detail-table td:nth-child(3) { display: none; }
+  /* Pas colspan aan voor tfoot */
+  .art-detail-table tfoot td:first-child { display: none; }
+  /* Tabel scrollt horizontaal als fallback */
+  .art-detail-table { font-size: 11px; }
+}
 </style>
 
   <!-- MSAL.js via betrouwbare CDN -->
