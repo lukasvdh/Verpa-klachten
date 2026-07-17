@@ -146,7 +146,28 @@ button,input,select,textarea{font-family:inherit;font-size:13.5px}
 .fg input.err,.fg select.err,.fg textarea.err{border-color:var(--red);box-shadow:0 0 0 3px rgba(220,38,38,.1)}
 .fg textarea{resize:vertical;min-height:88px}
 .req{color:var(--red)}.opt{color:var(--light);font-weight:400}
+.required{color:var(--red)}
+.optional{color:var(--light);font-weight:400;font-size:11px}
 .form-actions{display:flex;gap:8px;align-items:center}
+.view-header{margin-bottom:24px}
+.view-header h2{font-size:20px;font-weight:700;color:var(--text)}
+.view-subtitle{font-size:13px;color:var(--muted);margin-top:3px}
+.form-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:28px;max-width:820px;box-shadow:var(--sh)}
+.form-group{display:flex;flex-direction:column;gap:5px}
+.form-group label{font-size:12px;font-weight:700;color:var(--text)}
+.form-group input,.form-group select,.form-group textarea{border:1.5px solid var(--border);border-radius:8px;padding:8px 11px;color:var(--text);background:var(--surface);outline:none;transition:.15s;width:100%}
+.form-group input:focus,.form-group select:focus,.form-group textarea:focus{border-color:var(--navy2);box-shadow:0 0 0 3px rgba(45,95,138,.1)}
+.form-group input.invalid,.form-group select.invalid,.form-group textarea.invalid{border-color:var(--red);box-shadow:0 0 0 3px rgba(220,38,38,.1)}
+.form-group textarea{resize:vertical;min-height:88px}
+.form-full{grid-column:1/-1}
+.input-prefix{display:flex;align-items:center;border:1.5px solid var(--border);border-radius:8px;overflow:hidden;background:var(--surface);transition:.15s}
+.input-prefix:focus-within{border-color:var(--navy2);box-shadow:0 0 0 3px rgba(45,95,138,.1)}
+.input-prefix span{padding:8px 10px;background:var(--gray-bg);color:var(--muted);font-size:13px;font-weight:600;border-right:1px solid var(--border);white-space:nowrap}
+.input-prefix input{border:none;border-radius:0;padding:8px 11px;flex:1;outline:none;box-shadow:none!important}
+.btn-secondary{background:var(--surface);color:var(--text);border-color:var(--border2)}
+.btn-secondary:hover{background:var(--gray-bg)}
+.link{color:var(--navy2);cursor:pointer;text-decoration:underline}
+.file-drop-lg{padding:32px}
 .alert{display:flex;align-items:flex-start;gap:10px;padding:11px 14px;border-radius:8px;font-size:13px;margin-bottom:14px}
 .alert-ok{background:var(--green-bg);color:#14532D;border:1px solid #86EFAC}
 .alert-err{background:var(--red-bg);color:#7F1D1D;border:1px solid #FCA5A5}
@@ -480,13 +501,50 @@ button,input,select,textarea{font-family:inherit;font-size:13.5px}
               <label for="fOmschrijving">Omschrijving <span class="required">*</span></label>
               <textarea id="fOmschrijving" rows="4" placeholder="Gedetailleerde uitleg van de klacht en gewenste oplossing…"></textarea>
             </div>
-            <div class="form-group">
-              <label for="fBedrag">Bedrag (excl. BTW) <span class="required">*</span></label>
-              <div class="input-prefix">
-                <span>€</span>
-                <input type="number" id="fBedrag" min="0" step="0.01" placeholder="0,00" />
+          </div>
+
+          <!-- Artikelregels -->
+          <div class="art-section">
+            <div class="art-section-hd">
+              <h3>Artikelregels <span class="required">*</span> <span style="font-size:11px;color:var(--muted);font-weight:400">minimaal 1 regel</span></h3>
+              <span id="artTotaalBadge" style="font-size:13px;font-weight:700;color:var(--navy)">€ 0,00</span>
+            </div>
+            <div class="art-table-wrap">
+              <table class="art-table">
+                <colgroup>
+                  <col style="width:140px">
+                  <col>
+                  <col style="width:80px">
+                  <col style="width:80px">
+                  <col style="width:110px">
+                  <col style="width:36px">
+                </colgroup>
+                <thead>
+                  <tr>
+                    <th>Artikelnummer</th>
+                    <th>Artikelnaam</th>
+                    <th>UOM</th>
+                    <th>Aantal</th>
+                    <th>Eenheidsprijs</th>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody id="artBody"></tbody>
+              </table>
+              <button type="button" class="art-add-row" onclick="addArtRow()">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                Artikelregel toevoegen
+              </button>
+            </div>
+            <div class="art-totaal">
+              <div class="art-totaal-box">
+                <span class="art-totaal-lbl">Totaal (excl. BTW)</span>
+                <span class="art-totaal-val" id="artTotaal">€ 0,00</span>
               </div>
             </div>
+          </div>
+
+          <div class="form-grid" style="margin-top:14px">
             <div class="form-group">
               <label for="fBijlage">Bijlagen <span class="optional">(optioneel, max 10 MB)</span></label>
               <div class="file-drop" id="fileDrop">

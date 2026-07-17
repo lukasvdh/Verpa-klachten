@@ -512,6 +512,7 @@ let selectedFiles = [];
 
 function setupForm() {
   document.getElementById('btnSubmit').addEventListener('click', submitKlacht);
+  addArtRow(); // start met 1 lege rij
 
   // File drag & drop
   const drop = document.getElementById('fileDrop');
@@ -563,51 +564,134 @@ function removeFile(i) {
 }
 
 function resetForm() {
-  ['fKlant','fKlantnr','fFactuurnr','fOmschrijving','fBedrag'].forEach(id => {
+  ['fKlant','fKlantnr','fFactuurnr','fOmschrijving'].forEach(id => {
     const el = document.getElementById(id);
     if (el) { el.value = ''; el.classList.remove('invalid'); }
   });
   document.getElementById('fType').value = '';
   selectedFiles = [];
   renderFileList();
+  // Reset artikelregels
+  document.getElementById('artBody').innerHTML = '';
+  addArtRow();
+  updateArtTotaal();
   hide('formSuccess');
   hide('formError');
+}
+
+/* ══════════════════ ARTIKELREGELS ══════════════════ */
+let artRowId = 0;
+
+function addArtRow() {
+  const id = ++artRowId;
+  const tbody = document.getElementById('artBody');
+  const tr = document.createElement('tr');
+  tr.id = 'art-row-' + id;
+  tr.innerHTML = `
+    <td><input class="art-input" placeholder="bijv. VB-4421" oninput="updateArtTotaal()" data-field="artnr" /></td>
+    <td><input class="art-input" placeholder="Artikelnaam" oninput="updateArtTotaal()" data-field="naam" /></td>
+    <td>
+      <select class="art-select" onchange="updateArtTotaal()" data-field="uom">
+        <option>ST</option><option>DS</option><option>KG</option><option>LT</option><option>M2</option><option>PAL</option>
+      </select>
+    </td>
+    <td><input class="art-input" type="number" min="0" step="1" value="1" oninput="updateArtTotaal()" data-field="aantal" style="text-align:right" /></td>
+    <td>
+      <div style="display:flex;align-items:center;gap:3px">
+        <span style="color:var(--muted);font-size:12px">€</span>
+        <input class="art-input" type="number" min="0" step="0.01" value="0" oninput="updateArtTotaal()" data-field="prijs" style="text-align:right" />
+      </div>
+    </td>
+    <td>
+      <button type="button" class="art-del" onclick="delArtRow(${id})" title="Verwijderen">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/></svg>
+      </button>
+    </td>
+  `;
+  tbody.appendChild(tr);
+  updateArtTotaal();
+}
+
+function delArtRow(id) {
+  const row = document.getElementById('art-row-' + id);
+  if (row) row.remove();
+  updateArtTotaal();
+}
+
+function updateArtTotaal() {
+  const rows = document.querySelectorAll('#artBody tr');
+  let total = 0;
+  rows.forEach(tr => {
+    const aantal = parseFloat(tr.querySelector('[data-field="aantal"]')?.value) || 0;
+    const prijs  = parseFloat(tr.querySelector('[data-field="prijs"]')?.value)  || 0;
+    total += aantal * prijs;
+  });
+  const fmt = total.toLocaleString('nl-BE', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const el1 = document.getElementById('artTotaal');
+  const el2 = document.getElementById('artTotaalBadge');
+  if (el1) el1.textContent = '€ ' + fmt;
+  if (el2) el2.textContent = '€ ' + fmt;
+}
+
+function getArtRegels() {
+  const rows = document.querySelectorAll('#artBody tr');
+  return Array.from(rows).map(tr => ({
+    artnr: tr.querySelector('[data-field="artnr"]')?.value.trim() || '',
+    naam:  tr.querySelector('[data-field="naam"]')?.value.trim()  || '',
+    uom:   tr.querySelector('[data-field="uom"]')?.value          || 'ST',
+    aantal: parseFloat(tr.querySelector('[data-field="aantal"]')?.value) || 0,
+    prijs:  parseFloat(tr.querySelector('[data-field="prijs"]')?.value)  || 0,
+  }));
 }
 
 async function submitKlacht() {
   hide('formSuccess');
   hide('formError');
 
-  // Validatie
-  const fields = {
-    Klantnaam:    document.getElementById('fKlant').value.trim(),
-    Klantnummer:  document.getElementById('fKlantnr').value.trim(),
-    Factuurnummer: document.getElementById('fFactuurnr').value.trim(),
-    TypeKlacht:   document.getElementById('fType').value,
-    Omschrijving: document.getElementById('fOmschrijving').value.trim(),
-    Bedrag:       parseFloat(document.getElementById('fBedrag').value),
+  // Validatie basisvelden
+  const basicFields = {
+    Klantnaam:     { id: 'fKlant',      val: document.getElementById('fKlant').value.trim() },
+    Klantnummer:   { id: 'fKlantnr',    val: document.getElementById('fKlantnr').value.trim() },
+    Factuurnummer: { id: 'fFactuurnr',  val: document.getElementById('fFactuurnr').value.trim() },
+    TypeKlacht:    { id: 'fType',       val: document.getElementById('fType').value },
+    Omschrijving:  { id: 'fOmschrijving', val: document.getElementById('fOmschrijving').value.trim() },
   };
 
   let valid = true;
-  Object.entries(fields).forEach(([key, val]) => {
-    let elId;
-    if (key === 'Klantnaam')    elId = 'fKlant';
-    if (key === 'Klantnummer')  elId = 'fKlantnr';
-    if (key === 'Factuurnummer') elId = 'fFactuurnr';
-    if (key === 'TypeKlacht')   elId = 'fType';
-    if (key === 'Omschrijving') elId = 'fOmschrijving';
-    if (key === 'Bedrag')       elId = 'fBedrag';
-    const el = document.getElementById(elId);
-    if (!val && val !== 0) { el.classList.add('invalid'); valid = false; }
-    else if (key === 'Bedrag' && (isNaN(val) || val < 0)) { el.classList.add('invalid'); valid = false; }
+  Object.values(basicFields).forEach(({ id, val }) => {
+    const el = document.getElementById(id);
+    if (!val) { el.classList.add('invalid'); valid = false; }
     else el.classList.remove('invalid');
   });
 
-  if (!valid) {
-    showError('formErrorMsg', 'Vul alle verplichte velden correct in.');
+  // Validatie artikelregels
+  const artikelregels = getArtRegels();
+  const hasValidRow = artikelregels.some(r => r.artnr || r.naam);
+  if (!hasValidRow) {
+    valid = false;
+    showError('formErrorMsg', 'Voeg minimaal 1 artikelregel toe.');
     show('formError');
+  }
+
+  if (!valid) {
+    if (hasValidRow) {
+      showError('formErrorMsg', 'Vul alle verplichte velden correct in.');
+      show('formError');
+    }
     return;
   }
+
+  // Bereken totaalbedrag uit artikelregels
+  const bedrag = artikelregels.reduce((sum, r) => sum + (r.aantal * r.prijs), 0);
+
+  const fields = {
+    Klantnaam:    basicFields.Klantnaam.val,
+    Klantnummer:  basicFields.Klantnummer.val,
+    Factuurnummer: basicFields.Factuurnummer.val,
+    TypeKlacht:   basicFields.TypeKlacht.val,
+    Omschrijving: basicFields.Omschrijving.val,
+    Bedrag:       bedrag,
+  };
 
   const btn = document.getElementById('btnSubmit');
   btn.disabled = true;
@@ -623,6 +707,7 @@ async function submitKlacht() {
       DatumMelding:  new Date().toISOString(),
       Melder:        currentUser.email,
       MelderNaam:    currentUser.name,
+      Artikelregels: JSON.stringify(artikelregels),
     });
 
     document.getElementById('successDossier').textContent = ` Dossiernummer: ${dossiernummer}`;
