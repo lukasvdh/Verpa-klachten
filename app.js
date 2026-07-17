@@ -99,19 +99,9 @@ async function onSignedIn(account) {
   const profile = await graphGet('/me', token);
   const email = (profile.mail || profile.userPrincipalName || '').toLowerCase();
 
-  // Check app-rol toewijzing via Entra
-  let isAdmin = false;
-  try {
-    const roleResp = await fetch('https://graph.microsoft.com/v1.0/me/appRoleAssignments', {
-      headers: { Authorization: `Bearer ${token}` },
-    });
-    if (roleResp.ok) {
-      const roleData = await roleResp.json();
-      isAdmin = roleData.value.some(r => r.appRoleId === CONFIG.adminRoleId);
-    }
-  } catch (e) {
-    console.warn('Admin rolcheck mislukt:', e);
-  }
+  // Check app-rol via ID token claims (zelfde aanpak als andere Verpa apps)
+  const roles = (account && account.idTokenClaims && account.idTokenClaims.roles) || [];
+  const isAdmin = roles.includes('admin');
 
   currentUser = {
     name:    profile.displayName || account.name || 'Gebruiker',
