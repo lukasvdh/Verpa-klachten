@@ -311,7 +311,7 @@ async function loadDashboard() {
 function filterFase(type, el) {
   document.querySelectorAll('.fase-card').forEach(function(c){c.classList.remove('active-fase');});
   el.classList.add('active-fase');
-  document.getElementById('fType').value = type;
+  document.getElementById('filterType').value = type;
   renderList();
 }
 
@@ -319,8 +319,8 @@ function renderList(){
   if (!allKlachten) return;
   updateFaseCounts();
   var search=(document.getElementById('searchInput')?.value||'').toLowerCase();
-  var ftype=(document.getElementById('fType')?.value)||'';
-  var fstat=(document.getElementById('fStatus')?.value)||'';
+  var ftype=(document.getElementById('filterType')?.value)||'';
+  var fstat=(document.getElementById('filterStatus')?.value)||'';
   var items=allKlachten.filter(function(k){return(!fstat||k.Status===fstat)&&(!ftype||k.TypeKlacht===ftype)&&(!search||k.Klantnaam.toLowerCase().includes(search)||k.Dossiernummer.toLowerCase().includes(search)||(k.TypeKlacht||'').toLowerCase().includes(search));});
   var cntOpen=allKlachten.filter(function(k){return k.Status==='Wachtend op goedkeuring';}).length;
   var cntDone=allKlachten.filter(function(k){return k.Status==='Goedgekeurd'||k.Status==='Geklasseerd';}).length;
@@ -363,7 +363,7 @@ function updateFaseCounts(){
 }
 
 // Status filter change
-document.getElementById('filterStatus')?.addEventListener('change', loadDashboard);
+
 
 /* ══════════════════ REVIEW VIEW ══════════════════ */
 async function loadReview() {
