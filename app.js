@@ -129,6 +129,14 @@ async function onSignedIn(account) {
   setupModals();
 
   await loadDashboard();
+
+  // Deep-link: open dossier direct via ?dossier=2026-XXXX
+  const urlParams = new URLSearchParams(window.location.search);
+  const dossierParam = urlParams.get('dossier');
+  if (dossierParam) {
+    const match = allKlachten.find(k => k.Dossiernummer === dossierParam);
+    if (match) openDetail(match.id);
+  }
 }
 
 /* ══════════════════ MSAL HELPERS ══════════════════ */
@@ -529,10 +537,11 @@ function openDetail(id){
   var cnHtml=k.CreditnotaNr?'<div><div class="d-lbl">Creditnota</div><div class="d-val" style="font-family:monospace;font-weight:700;color:var(--green)">'+k.CreditnotaNr+'</div></div>':'';
   document.getElementById('modalBody').innerHTML='<div class="detail-grid"><div><div class="d-lbl">Dossiernummer</div><div class="d-val" style="font-family:monospace;font-size:15px;font-weight:700;color:var(--navy)">'+k.Dossiernummer+'</div></div><div><div class="d-lbl">Status</div><div class="d-val">'+statusBadge(k.Status)+'</div></div><div><div class="d-lbl">Datum melding</div><div class="d-val">'+fmtDate(k.DatumMelding)+'</div></div><div><div class="d-lbl">Type klacht</div><div class="d-val">'+(typePill[k.TypeKlacht]||k.TypeKlacht)+'</div></div><div><div class="d-lbl">Klantnaam</div><div class="d-val">'+k.Klantnaam+'</div></div><div><div class="d-lbl">Klantnummer</div><div class="d-val">'+k.Klantnummer+'</div></div><div><div class="d-lbl">Factuurnummer</div><div class="d-val">'+k.Factuurnummer+'</div></div>'+(k.BeoordeeldDoor?'<div><div class="d-lbl">Beoordeeld door</div><div class="d-val">'+k.BeoordeeldDoor+'</div></div>':'')+cnHtml+'<div class="d-full"><div class="d-lbl">Omschrijving</div><div class="d-val desc">'+k.Omschrijving+'</div></div><div><div class="d-lbl">Ingediend door</div><div class="d-val">'+(k.MelderNaam||'\u2013')+'</div></div></div>'+artHtml+rejectHtml;
   var foot=document.getElementById('modalFooter');
+  var retourBtn='<button class="btn btn-secondary" onclick="printRetour(\''+k.id+'\')">&#128196; Retourkaart</button>';
   var delBtn=currentUser.isAdmin?'<button class="btn btn-danger" style="margin-left:auto" onclick="deleteKlacht(\''+k.id+'\',\''+k.Dossiernummer+'\')" title="Verwijderen">&#128465; Verwijderen</button>':'';
-  if(k.Status==='Wachtend op goedkeuring'){foot.innerHTML='<button class="btn btn-success" onclick="approveKlacht(\''+k.id+'\')">&#10003; Goedkeuren</button><button class="btn btn-danger" onclick="openReject(\''+k.id+'\')">&#10007; Weigeren</button><button class="btn btn-ghost" onclick="closeModal()">Sluiten</button>'+delBtn;}
-  else if(k.Status==='Goedgekeurd'){foot.innerHTML='<div style="display:flex;align-items:center;gap:8px;flex:1;flex-wrap:wrap"><div style="display:flex;align-items:center;border:1.5px solid var(--border);border-radius:8px;overflow:hidden;background:var(--surface)"><span style="padding:6px 10px;background:var(--gray-bg);color:var(--muted);font-size:12px;font-weight:600;border-right:1px solid var(--border);white-space:nowrap">Creditnota</span><input id="creditnota-input" type="text" placeholder="bijv. CN2026-00123 (optioneel)" value="'+(k.CreditnotaNr||'')+'" style="border:none;padding:6px 10px;font-size:13px;color:var(--text);outline:none;width:220px;font-family:monospace;font-weight:600"/></div><button class="btn btn-success btn-sm" onclick="saveCreditnota(\''+k.id+'\')">Opslaan</button></div><button class="btn btn-ghost" onclick="closeModal()">Sluiten</button>'+delBtn;}
-  else{foot.innerHTML='<button class="btn" onclick="closeModal()">Sluiten</button>'+delBtn;}
+  if(k.Status==='Wachtend op goedkeuring'){foot.innerHTML='<button class="btn btn-success" onclick="approveKlacht(\''+k.id+'\')">&#10003; Goedkeuren</button><button class="btn btn-danger" onclick="openReject(\''+k.id+'\')">&#10007; Weigeren</button><button class="btn btn-ghost" onclick="closeModal()">Sluiten</button>'+retourBtn+delBtn;}
+  else if(k.Status==='Goedgekeurd'){foot.innerHTML='<div style="display:flex;align-items:center;gap:8px;flex:1;flex-wrap:wrap"><div style="display:flex;align-items:center;border:1.5px solid var(--border);border-radius:8px;overflow:hidden;background:var(--surface)"><span style="padding:6px 10px;background:var(--gray-bg);color:var(--muted);font-size:12px;font-weight:600;border-right:1px solid var(--border);white-space:nowrap">Creditnota</span><input id="creditnota-input" type="text" placeholder="bijv. CN2026-00123 (optioneel)" value="'+(k.CreditnotaNr||'')+'" style="border:none;padding:6px 10px;font-size:13px;color:var(--text);outline:none;width:220px;font-family:monospace;font-weight:600"/></div><button class="btn btn-success btn-sm" onclick="saveCreditnota(\''+k.id+'\')">Opslaan</button></div><button class="btn btn-ghost" onclick="closeModal()">Sluiten</button>'+retourBtn+delBtn;}
+  else{foot.innerHTML='<button class="btn" onclick="closeModal()">Sluiten</button>'+retourBtn+delBtn;}
   document.getElementById('modalOverlay').classList.remove('hidden');
 }
 
@@ -986,6 +995,14 @@ async function runImport() {
   btnConfirm.disabled = false;
   importData = [];
   await loadDashboard();
+
+  // Deep-link: open dossier direct via ?dossier=2026-XXXX
+  const urlParams = new URLSearchParams(window.location.search);
+  const dossierParam = urlParams.get('dossier');
+  if (dossierParam) {
+    const match = allKlachten.find(k => k.Dossiernummer === dossierParam);
+    if (match) openDetail(match.id);
+  }
 }
 
 /* ══════════════════ UTILS ══════════════════ */
@@ -1039,3 +1056,141 @@ function showToast(msg, type = '') {
 
 /* ══════════════════ START ══════════════════ */
 init();
+
+/* ══════════════════ RETOUR DOCUMENT ══════════════════ */
+function printRetour(itemId) {
+  var k = allKlachten.find(function(x){ return x.id === itemId; });
+  if (!k) return;
+
+  var artikelregels = [];
+  try { artikelregels = JSON.parse(k.Artikelregels || '[]').filter(function(r){ return r.artnr || r.naam; }); } catch(e){}
+
+  var totaal = artikelregels.reduce(function(s,r){ return s + (r.aantal * r.prijs); }, 0);
+  var fmtTot = totaal.toLocaleString('nl-BE', {minimumFractionDigits:2, maximumFractionDigits:2});
+
+  var qrUrl = 'https://verpa-klachten.pages.dev/?dossier=' + encodeURIComponent(k.Dossiernummer);
+  var qrSrc = 'https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=' + encodeURIComponent(qrUrl);
+
+  var artRows = artikelregels.map(function(r){
+    var lijn = (r.aantal * r.prijs).toLocaleString('nl-BE', {minimumFractionDigits:2, maximumFractionDigits:2});
+    return '<tr><td>' + esc(r.artnr) + '</td><td>' + esc(r.naam) + '</td><td style="text-align:center">' + esc(r.uom) + '</td><td style="text-align:right">' + r.aantal + '</td><td style="text-align:right">€ ' + r.prijs.toLocaleString('nl-BE',{minimumFractionDigits:2,maximumFractionDigits:2}) + '</td><td style="text-align:right">€ ' + lijn + '</td></tr>';
+  }).join('');
+
+  var datumFormatted = k.DatumMelding ? new Date(k.DatumMelding).toLocaleDateString('nl-BE') : '–';
+
+  var html = `<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="UTF-8"/>
+<title>Retour ${esc(k.Dossiernummer)}</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Helvetica Neue', Arial, sans-serif; font-size: 12px; color: #111; background: #fff; padding: 28px 32px; }
+  .header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 24px; padding-bottom: 16px; border-bottom: 2px solid #1B3F6A; }
+  .header-left h1 { font-size: 22px; font-weight: 800; color: #1B3F6A; letter-spacing: -.5px; }
+  .header-left .sub { font-size: 11px; color: #64748B; margin-top: 2px; }
+  .dossier-badge { background: #1B3F6A; color: #fff; font-size: 15px; font-weight: 700; padding: 6px 14px; border-radius: 6px; letter-spacing: .5px; }
+  .section { margin-bottom: 20px; }
+  .section-title { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: .1em; color: #94A3B8; margin-bottom: 8px; }
+  .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 24px; }
+  .info-item label { font-size: 9px; text-transform: uppercase; letter-spacing: .07em; color: #94A3B8; display: block; margin-bottom: 2px; }
+  .info-item span { font-size: 13px; font-weight: 600; color: #0F172A; }
+  .omschrijving-box { background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 6px; padding: 10px 12px; font-size: 12px; color: #334155; line-height: 1.5; }
+  table { width: 100%; border-collapse: collapse; font-size: 11.5px; }
+  thead tr { background: #1B3F6A; color: #fff; }
+  thead th { padding: 7px 10px; text-align: left; font-weight: 700; font-size: 10px; text-transform: uppercase; letter-spacing: .05em; }
+  tbody tr:nth-child(even) { background: #F8FAFC; }
+  tbody td { padding: 6px 10px; border-bottom: 1px solid #E2E8F0; }
+  .totaal-row td { font-weight: 700; font-size: 13px; border-top: 2px solid #1B3F6A; border-bottom: none; padding-top: 8px; }
+  .bottom { display: flex; gap: 24px; margin-top: 24px; padding-top: 16px; border-top: 1px solid #E2E8F0; }
+  .sign-box { flex: 1; border: 1.5px dashed #CBD5E1; border-radius: 8px; padding: 12px 16px; min-height: 100px; }
+  .sign-box .sign-label { font-size: 9px; text-transform: uppercase; letter-spacing: .08em; color: #94A3B8; font-weight: 700; margin-bottom: 4px; }
+  .sign-box .sign-name { font-size: 11px; color: #64748B; margin-top: 6px; }
+  .qr-box { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+  .qr-box img { width: 110px; height: 110px; }
+  .qr-box .qr-label { font-size: 9px; color: #94A3B8; text-align: center; max-width: 110px; line-height: 1.4; }
+  .type-pill { display: inline-block; background: #EBF3FA; color: #1B3F6A; font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 20px; }
+  .footer { margin-top: 20px; font-size: 9px; color: #94A3B8; text-align: center; border-top: 1px solid #E2E8F0; padding-top: 10px; }
+  @media print {
+    body { padding: 16px 20px; }
+    @page { margin: 12mm; }
+  }
+</style>
+</head>
+<body>
+  <div class="header">
+    <div class="header-left">
+      <div style="background:#1B3F6A;border-radius:8px;padding:8px 16px;display:inline-block;margin-bottom:6px">
+        <img src="https://verpa.be/wp-content/uploads/2023/03/cropped-Transparant-logo-Verpa_Lukas-1-2048x594.png" alt="Verpa" style="height:36px;display:block" />
+      </div>
+      <div class="sub">Verkoop Retour Verzending</div>
+    </div>
+    <div style="text-align:right">
+      <div class="dossier-badge">${esc(k.Dossiernummer)}</div>
+      <div style="font-size:10px;color:#64748B;margin-top:6px">Opgemaakt op ${new Date().toLocaleDateString('nl-BE')}</div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">Klantgegevens</div>
+    <div class="info-grid">
+      <div class="info-item"><label>Klantnaam</label><span>${esc(k.Klantnaam)}</span></div>
+      <div class="info-item"><label>Klantnummer</label><span>${esc(k.Klantnummer)}</span></div>
+      <div class="info-item"><label>Factuurnummer</label><span>${esc(k.Factuurnummer)}</span></div>
+      <div class="info-item"><label>Datum melding</label><span>${datumFormatted}</span></div>
+      <div class="info-item"><label>Type klacht</label><span class="type-pill">${esc(k.TypeKlacht)}</span></div>
+      <div class="info-item"><label>Ingediend door</label><span>${esc(k.MelderNaam||k.Melder)}</span></div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">Omschrijving</div>
+    <div class="omschrijving-box">${esc(k.Omschrijving)}</div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">Te retourneren artikelen</div>
+    <table>
+      <thead><tr>
+        <th>Artikelnr.</th><th>Artikelnaam</th><th style="text-align:center">UOM</th>
+        <th style="text-align:right">Aantal</th><th style="text-align:right">Prijs/st.</th><th style="text-align:right">Totaal</th>
+      </tr></thead>
+      <tbody>
+        ${artRows}
+        <tr class="totaal-row">
+          <td colspan="5" style="text-align:right">Totaal (excl. BTW)</td>
+          <td style="text-align:right">€ ${fmtTot}</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="bottom">
+    <div class="sign-box" style="flex:2">
+      <div class="sign-label">Handtekening klant voor ontvangst retour</div>
+      <div style="height:60px"></div>
+      <div class="sign-name">Naam: _____________________________ &nbsp;&nbsp; Datum: _______________</div>
+    </div>
+    <div class="sign-box" style="flex:1.2">
+      <div class="sign-label">Handtekening chauffeur</div>
+      <div style="height:60px"></div>
+      <div class="sign-name">Naam: _____________________________</div>
+    </div>
+    <div class="qr-box">
+      <img src="${qrSrc}" alt="QR code dossier" />
+      <div class="qr-label">Scan voor digitaal dossier ${esc(k.Dossiernummer)}</div>
+    </div>
+  </div>
+
+  <div class="footer">
+    Verpa Benelux NV &nbsp;·&nbsp; Laakdal &amp; Stora &nbsp;·&nbsp; verpabenelux.be &nbsp;·&nbsp; Dossier ${esc(k.Dossiernummer)}
+  </div>
+
+  <script>window.onload = function(){ window.print(); }<\/script>
+</body>
+</html>`;
+
+  var win = window.open('', '_blank');
+  win.document.write(html);
+  win.document.close();
+}
