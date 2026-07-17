@@ -643,7 +643,7 @@ function removeFile(i) {
 }
 
 function resetForm() {
-  ['fKlant','fKlantnr','fFactuurnr','fOmschrijving'].forEach(id => {
+  ['fKlant','fKlantnr','fFactuurnr','fOmschrijving','fStraat','fPostcode','fGemeente'].forEach(id => {
     const el = document.getElementById(id);
     if (el) { el.value = ''; el.classList.remove('invalid'); }
   });
@@ -770,6 +770,9 @@ async function submitKlacht() {
     TypeKlacht:   basicFields.TypeKlacht.val,
     Omschrijving: basicFields.Omschrijving.val,
     Bedrag:       bedrag,
+    Straat:       document.getElementById('fStraat')?.value.trim() || '',
+    Postcode:     document.getElementById('fPostcode')?.value.trim() || '',
+    Gemeente:     document.getElementById('fGemeente')?.value.trim() || '',
   };
 
   const btn = document.getElementById('btnSubmit');
@@ -1131,16 +1134,28 @@ function printRetour(itemId) {
     </div>
   </div>
 
-  <div class="section">
-    <div class="section-title">Klantgegevens</div>
-    <div class="info-grid">
-      <div class="info-item"><label>Klantnaam</label><span>${esc(k.Klantnaam)}</span></div>
-      <div class="info-item"><label>Klantnummer</label><span>${esc(k.Klantnummer)}</span></div>
-      <div class="info-item"><label>Factuurnummer</label><span>${esc(k.Factuurnummer)}</span></div>
-      <div class="info-item"><label>Datum melding</label><span>${datumFormatted}</span></div>
-      <div class="info-item"><label>Type klacht</label><span class="type-pill">${esc(k.TypeKlacht)}</span></div>
-      <div class="info-item"><label>Ingediend door</label><span>${esc(k.MelderNaam||k.Melder)}</span></div>
+  <div class="section" style="display:flex;gap:24px">
+    <div style="flex:1">
+      <div class="section-title">Klantgegevens</div>
+      <div class="info-grid">
+        <div class="info-item"><label>Klantnaam</label><span>${esc(k.Klantnaam)}</span></div>
+        <div class="info-item"><label>Klantnummer</label><span>${esc(k.Klantnummer)}</span></div>
+        ${k.Straat ? '<div class="info-item" style="grid-column:1/-1"><label>Adres</label><span>' + esc(k.Straat) + '<br>' + esc((k.Postcode||'') + ' ' + (k.Gemeente||'')).trim() + '<br>België</span></div>' : ''}
+        <div class="info-item"><label>Factuurnummer</label><span>${esc(k.Factuurnummer)}</span></div>
+        <div class="info-item"><label>Datum melding</label><span>${datumFormatted}</span></div>
+        <div class="info-item"><label>Type klacht</label><span class="type-pill">${esc(k.TypeKlacht)}</span></div>
+        <div class="info-item"><label>Ingediend door</label><span>${esc(k.MelderNaam||k.Melder)}</span></div>
+      </div>
     </div>
+    ${k.Straat ? `<div style="min-width:160px;background:#F8FAFC;border:1px solid #E2E8F0;border-radius:8px;padding:14px 16px">
+      <div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:#94A3B8;margin-bottom:8px">Retouradres klant</div>
+      <div style="font-size:13px;font-weight:600;line-height:1.7;color:#0F172A">
+        ${esc(k.Klantnaam)}<br>
+        ${esc(k.Straat)}<br>
+        ${esc((k.Postcode||'') + ' ' + (k.Gemeente||'')).trim()}<br>
+        België
+      </div>
+    </div>` : ''}
   </div>
 
   <div class="section">
