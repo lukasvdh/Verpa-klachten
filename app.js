@@ -37,6 +37,70 @@ const msalConfig = {
 
 const GRAPH_SCOPES = ['User.Read', 'Sites.ReadWrite.All'];
 
+/* ── BUSINESS CENTRAL CONFIG ─────────────────────────────────────────
+   Vereiste App Registration permissie (Delegated):
+     - Dynamics 365 Business Central → Financials.ReadWrite.All
+   ─────────────────────────────────────────────────────────────────── */
+const BC_SCOPE      = 'https://api.businesscentral.dynamics.com/user_impersonation';
+const BC_BASE       = 'https://api.businesscentral.dynamics.com/v2.0';
+const BC_TENANT     = CONFIG.tenantId;
+const BC_ENV        = 'Verpa_Accept_09022026';
+let   BC_COMPANY_ID = null;         // wordt opgehaald bij eerste gebruik
+
+async function getBCToken() {
+  const accounts = msalInstance.getAllAccounts();
+  if (!accounts.length) return null;
+  try {
+    const resp = await msalInstance.acquireTokenSilent({ scopes: [BC_SCOPE], account: accounts[0] });
+    return resp.accessToken;
+  } catch {
+    try {
+      const resp = await msalInstance.acquireTokenPopup({ scopes: [BC_SCOPE] });
+      return resp.accessToken;
+    } catch (e) {
+      console.error('BC token fout:', e);
+      return null;
+    }
+  }
+}
+
+async function getBCCompanyId() {
+  if (BC_COMPANY_ID) return BC_COMPANY_ID;
+  const tok = await getBCToken();
+  if (!tok) throw new Error('Geen BC-token beschikbaar');
+  const r = await fetch(`${BC_BASE}/${BC_TENANT}/${BC_ENV}/api/v2.0/companies`, {
+    headers: { Authorization: `Bearer ${tok}` },
+  });
+  if (!r.ok) throw new Error(`BC companies: ${r.status}`);
+  const data = await r.json();
+  if (!data.value.length) throw new Error('Geen BC-company gevonden');
+  BC_COMPANY_ID = data.value[0].id;
+  return BC_COMPANY_ID;
+}
+
+async function bcZoekKlanten(zoekterm) {
+  const tok       = await getBCToken();
+  const companyId = await getBCCompanyId();
+  const filter    = `startswith(number,'${zoekterm.replace(/'/g, "''")}') or contains(displayName,'${zoekterm.replace(/'/g, "''")}')`;
+  const select    = 'id,number,displayName,email,phoneNumber,addressLine1,city,postalCode';
+  const url       = `${BC_BASE}/${BC_TENANT}/${BC_ENV}/api/v2.0/companies(${companyId})/customers?$filter=${encodeURIComponent(filter)}&$top=12&$select=${select}`;
+  const r = await fetch(url, { headers: { Authorization: `Bearer ${tok}` } });
+  if (!r.ok) throw new Error(`BC klanten: ${r.status}`);
+  const data = await r.json();
+  return data.value;
+}
+
+const BC_DEMO_KLANTEN = [
+  { number: 'K00001', displayName: 'Carrefour Belgium NV',       addressLine1: 'Olympiadenlaan 20',  postalCode: '1140', city: 'Evere'       },
+  { number: 'K00002', displayName: 'Colruyt Group NV',           addressLine1: 'Edingensesteenweg 196', postalCode: '1500', city: 'Halle'    },
+  { number: 'K00003', displayName: 'Delhaize Belgium',           addressLine1: 'Square Marie Curie 40', postalCode: '1070', city: 'Anderlecht' },
+  { number: 'K00004', displayName: 'AZ Turnhout',                addressLine1: 'Rubensstraat 166',   postalCode: '2300', city: 'Turnhout'    },
+  { number: 'K00005', displayName: 'Gemeente Mol',               addressLine1: 'Molenhoek 2',        postalCode: '2400', city: 'Mol'         },
+  { number: 'K00006', displayName: 'Hotel Industria',            addressLine1: 'Kleinhoefstraat 9',  postalCode: '2440', city: 'Geel'        },
+  { number: 'K00007', displayName: 'Lunch Garden Hasselt',       addressLine1: 'Genkersteenweg 14',  postalCode: '3500', city: 'Hasselt'     },
+  { number: 'K00008', displayName: 'Verpa Benelux NV (intern)',  addressLine1: 'Industrielaan 10',   postalCode: '2430', city: 'Laakdal'     },
+];
+
 // MSAL v3 exporteert via window.msalBrowser, v2 via window.msal
 const msalLib = window.msalBrowser || window.msal;
 
@@ -586,6 +650,106 @@ async function saveCreditnota(itemId) {
   }
 }
 
+/* ══════════════════ BC KLANTZOEKER ══════════════════ */
+let bcZoekTimeout = null;
+
+function bcZoekKlant(waarde) {
+  clearTimeout(bcZoekTimeout);
+  const status     = document.getElementById('bcZoekStatus');
+  const suggesties = document.getElementById('bcSuggesties');
+
+  if (waarde.trim().length < 2) {
+    status.classList.add('hidden');
+    suggesties.classList.add('hidden');
+    return;
+  }
+
+  status.textContent = 'Zoeken…';
+  status.classList.remove('hidden');
+  suggesties.classList.add('hidden');
+
+  bcZoekTimeout = setTimeout(async () => {
+    try {
+      const klanten = await bcZoekKlanten(waarde.trim());
+      status.classList.add('hidden');
+
+      if (!klanten.length) {
+        suggesties.innerHTML = '<div class="bc-sug-leeg">Geen klanten gevonden in BC</div>';
+        suggesties.classList.remove('hidden');
+        return;
+      }
+
+      toonSuggesties(klanten, false, suggesties);
+    } catch (e) {
+      // BC niet bereikbaar → filter op demodata
+      const term    = waarde.trim().toLowerCase();
+      const matches = BC_DEMO_KLANTEN.filter(k =>
+        k.number.toLowerCase().includes(term) ||
+        k.displayName.toLowerCase().includes(term) ||
+        k.city.toLowerCase().includes(term)
+      );
+
+      status.textContent = '⚠ BC niet beschikbaar – demodata';
+      status.classList.remove('hidden');
+
+      if (!matches.length) {
+        suggesties.innerHTML = '<div class="bc-sug-leeg">Geen demo-klanten gevonden</div>';
+      } else {
+        toonSuggesties(matches, true, suggesties);
+      }
+      suggesties.classList.remove('hidden');
+    }
+  }, 320);
+}
+
+function toonSuggesties(klanten, isDemo, container) {
+  container.innerHTML = klanten.map(k => `
+    <div class="bc-sug-item${isDemo ? ' bc-sug-demo' : ''}" onclick="bcSelecteerKlant(${JSON.stringify(k).replace(/"/g, '&quot;')})">
+      <div class="bc-sug-nr">${esc(k.number)}${isDemo ? ' <span class="bc-demo-tag">DEMO</span>' : ''}</div>
+      <div class="bc-sug-naam">${esc(k.displayName)}</div>
+      <div class="bc-sug-adres">${esc([k.addressLine1, k.postalCode, k.city].filter(Boolean).join(' · '))}</div>
+    </div>
+  `).join('');
+  container.classList.remove('hidden');
+}
+
+function bcSelecteerKlant(klant) {
+  // Vul formuliervelden in
+  const set = (id, val) => { const el = document.getElementById(id); if (el) { el.value = val || ''; el.classList.remove('invalid'); } };
+  set('fKlant',    klant.displayName);
+  set('fKlantnr',  klant.number);
+  set('fStraat',   klant.addressLine1);
+  set('fPostcode', klant.postalCode);
+  set('fGemeente', klant.city);
+
+  // Toon bevestiging
+  document.getElementById('bcGeselecteerdNaam').textContent = `${klant.number} – ${klant.displayName}`;
+  document.getElementById('bcGeselecteerd').classList.remove('hidden');
+
+  // Sluit dropdown en leeg zoekveld
+  document.getElementById('bcKlantZoek').value = '';
+  document.getElementById('bcSuggesties').classList.add('hidden');
+  document.getElementById('bcZoekStatus').classList.add('hidden');
+}
+
+function bcResetKlant() {
+  ['fKlant','fKlantnr','fStraat','fPostcode','fGemeente'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.value = '';
+  });
+  document.getElementById('bcGeselecteerd').classList.add('hidden');
+  document.getElementById('bcKlantZoek').value = '';
+  document.getElementById('bcKlantZoek').focus();
+}
+
+// Sluit dropdown bij klik buiten de zoeker
+document.addEventListener('click', e => {
+  if (!e.target.closest('.bc-search-wrap') && !e.target.closest('.bc-sug-item')) {
+    const sug = document.getElementById('bcSuggesties');
+    if (sug) sug.classList.add('hidden');
+  }
+});
+
 /* ══════════════════ FORM ══════════════════ */
 let selectedFiles = [];
 
@@ -643,6 +807,14 @@ function removeFile(i) {
 }
 
 function resetForm() {
+  // Reset BC klantzoeker
+  const bcZoek = document.getElementById('bcKlantZoek');
+  if (bcZoek) bcZoek.value = '';
+  const bcGes = document.getElementById('bcGeselecteerd');
+  if (bcGes) bcGes.classList.add('hidden');
+  const bcSug = document.getElementById('bcSuggesties');
+  if (bcSug) bcSug.classList.add('hidden');
+
   ['fKlant','fKlantnr','fFactuurnr','fOmschrijving','fStraat','fPostcode','fGemeente'].forEach(id => {
     const el = document.getElementById(id);
     if (el) { el.value = ''; el.classList.remove('invalid'); }
