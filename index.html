@@ -29,7 +29,7 @@ button,input,select,textarea{font-family:inherit;font-size:13.5px}
 .bc-search-block{background:var(--navy-bg);border:1.5px solid #C5DAEA;border-radius:10px;padding:14px 16px;margin-bottom:20px}
 .bc-search-label{display:flex;align-items:center;gap:6px;font-size:11.5px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--navy);margin-bottom:8px}
 .bc-search-wrap{position:relative}
-.bc-search-wrap input{width:100%;border:1px solid var(--border2);border-radius:8px;padding:8px 12px;font-size:13.5px;outline:none;background:var(--surface);color:var(--text);transition:border-color .15s}
+.bc-search-wrap input{width:100%;border:1px solid var(--border2);border-radius:8px;padding:8px 12px;font-size:13.5px;outline:none;background:var(--surface);color:var(--text);transition:border-color .15s;text-transform:uppercase;letter-spacing:.03em}
 .bc-search-wrap input:focus{border-color:var(--navy)}
 .bc-zoek-status{font-size:12px;color:var(--muted);padding:4px 0}
 .bc-suggesties{position:absolute;top:calc(100% + 4px);left:0;right:0;background:var(--surface);border:1px solid var(--border2);border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,0.12);z-index:100;max-height:260px;overflow-y:auto}
@@ -724,7 +724,7 @@ button,input,select,textarea{font-family:inherit;font-size:13.5px}
               Klant opzoeken in Business Central
             </label>
             <div class="bc-search-wrap">
-              <input type="text" id="bcKlantZoek" placeholder="Zoek op naam of klantnummer…" autocomplete="off" oninput="bcZoekKlant(this.value)" />
+              <input type="text" id="bcKlantZoek" placeholder="Zoek op naam of klantnummer…" autocomplete="off" oninput="this.value=this.value.toUpperCase();bcZoekKlant(this.value)" />
               <div id="bcZoekStatus" class="bc-zoek-status hidden"></div>
               <div id="bcSuggesties" class="bc-suggesties hidden"></div>
             </div>

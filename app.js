@@ -81,7 +81,7 @@ async function getBCCompanyId() {
 async function bcZoekKlanten(zoekterm) {
   const tok       = await getBCToken();
   const companyId = await getBCCompanyId();
-  const termLower = zoekterm.toLowerCase().replace(/'/g, "''");
+  const term = zoekterm.toUpperCase().replace(/'/g, "''");
   const select    = 'id,number,displayName,email,phoneNumber,addressLine1,city,postalCode';
   const base      = `${BC_BASE}/${BC_TENANT}/${BC_ENV}/api/v2.0/companies(${companyId})/customers`;
 
