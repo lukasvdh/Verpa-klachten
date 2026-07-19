@@ -81,7 +81,7 @@ async function getBCCompanyId() {
 async function bcZoekKlanten(zoekterm) {
   const tok       = await getBCToken();
   const companyId = await getBCCompanyId();
-  const term      = zoekterm.replace(/'/g, "''");
+  const termLower = zoekterm.toLowerCase().replace(/'/g, "''");
   const select    = 'id,number,displayName,email,phoneNumber,addressLine1,city,postalCode';
   const base      = `${BC_BASE}/${BC_TENANT}/${BC_ENV}/api/v2.0/companies(${companyId})/customers`;
 
@@ -89,8 +89,8 @@ async function bcZoekKlanten(zoekterm) {
 
   // BC ondersteunt geen 'or' over verschillende velden → twee aparte calls
   const [r1, r2] = await Promise.all([
-    fetch(`${base}?$filter=${encodeURIComponent("startswith(number,'" + term + "')")}&$top=8&$select=${select}`, { headers }),
-    fetch(`${base}?$filter=${encodeURIComponent("contains(displayName,'" + term + "')")}&$top=8&$select=${select}`, { headers }),
+    fetch(`${base}?$filter=${encodeURIComponent("startswith(tolower(number),'" + termLower + "')")}&$top=8&$select=${select}`, { headers }),
+    fetch(`${base}?$filter=${encodeURIComponent("contains(tolower(displayName),'" + termLower + "')")}&$top=8&$select=${select}`, { headers }),
   ]);
 
   if (!r1.ok && !r2.ok) throw new Error(`BC klanten: ${r1.status}`);
