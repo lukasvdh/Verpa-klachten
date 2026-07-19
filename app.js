@@ -732,14 +732,42 @@ function toonSuggesties(klanten, isDemo, container) {
   container.classList.remove('hidden');
 }
 
-function bcSelecteerKlant(klant) {
-  // Vul formuliervelden in
+let bcHuidigeLeveradressen = [];
+
+async function bcHaalLeveradressen(klantId) {
+  const tok       = await getBCToken();
+  const companyId = await getBCCompanyId();
+  const url = `${BC_BASE}/${BC_TENANT}/${BC_ENV}/api/v2.0/companies(${companyId})/customers(${klantId})/shipToAddresses?$select=code,displayName,addressLine1,city,postalCode`;
+  const r = await fetch(url, { headers: { Authorization: `Bearer ${tok}` } });
+  if (!r.ok) return [];
+  const data = await r.json();
+  return data.value || [];
+}
+
+function bcVulAdres(straat, postcode, gemeente) {
+  const set = (id, val) => { const el = document.getElementById(id); if (el) { el.value = val || ''; el.classList.remove('invalid'); } };
+  set('fStraat',   straat);
+  set('fPostcode', postcode);
+  set('fGemeente', gemeente);
+}
+
+function bcSelecteerLeveradres(code) {
+  if (!code) {
+    // Terug naar facturatieadres
+    const klant = bcHuidigeLeveradressen._klant;
+    if (klant) bcVulAdres(klant.addressLine1, klant.postalCode, klant.city);
+    return;
+  }
+  const adres = bcHuidigeLeveradressen.find(a => a.code === code);
+  if (adres) bcVulAdres(adres.addressLine1, adres.postalCode, adres.city);
+}
+
+async function bcSelecteerKlant(klant) {
+  // Vul basisvelden in
   const set = (id, val) => { const el = document.getElementById(id); if (el) { el.value = val || ''; el.classList.remove('invalid'); } };
   set('fKlant',    klant.displayName);
   set('fKlantnr',  klant.number);
-  set('fStraat',   klant.addressLine1);
-  set('fPostcode', klant.postalCode);
-  set('fGemeente', klant.city);
+  bcVulAdres(klant.addressLine1, klant.postalCode, klant.city);
 
   // Toon bevestiging
   document.getElementById('bcGeselecteerdNaam').textContent = `${klant.number} – ${klant.displayName}`;
@@ -749,6 +777,32 @@ function bcSelecteerKlant(klant) {
   document.getElementById('bcKlantZoek').value = '';
   document.getElementById('bcSuggesties').classList.add('hidden');
   document.getElementById('bcZoekStatus').classList.add('hidden');
+
+  // Haal leveradressen op (enkel als klant een BC id heeft)
+  const leveradresBlock  = document.getElementById('bcLeveradresBlock');
+  const leveradresSelect = document.getElementById('bcLeveradresSelect');
+  leveradresBlock.classList.add('hidden');
+  leveradresSelect.innerHTML = '<option value="">— Facturatieadres gebruiken —</option>';
+  bcHuidigeLeveradressen = [];
+
+  if (klant.id) {
+    try {
+      const adressen = await bcHaalLeveradressen(klant.id);
+      if (adressen.length) {
+        bcHuidigeLeveradressen = adressen;
+        bcHuidigeLeveradressen._klant = klant; // bewaar voor reset
+        adressen.forEach(a => {
+          const opt = document.createElement('option');
+          opt.value = a.code;
+          opt.textContent = `${a.code}${a.displayName ? ' – ' + a.displayName : ''} · ${[a.addressLine1, a.postalCode, a.city].filter(Boolean).join(', ')}`;
+          leveradresSelect.appendChild(opt);
+        });
+        leveradresBlock.classList.remove('hidden');
+      }
+    } catch (e) {
+      // Geen leveradressen beschikbaar – stilletjes negeren
+    }
+  }
 }
 
 function bcResetKlant() {
@@ -757,6 +811,9 @@ function bcResetKlant() {
     if (el) el.value = '';
   });
   document.getElementById('bcGeselecteerd').classList.add('hidden');
+  document.getElementById('bcLeveradresBlock').classList.add('hidden');
+  document.getElementById('bcLeveradresSelect').innerHTML = '<option value="">— Facturatieadres gebruiken —</option>';
+  bcHuidigeLeveradressen = [];
   document.getElementById('bcKlantZoek').value = '';
   document.getElementById('bcKlantZoek').focus();
 }
