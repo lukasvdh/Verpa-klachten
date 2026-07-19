@@ -735,19 +735,19 @@ function toonSuggesties(klanten, isDemo, container) {
 let bcHuidigeLeveradressen = [];
 
 async function bcHaalLeveradressen(klantNr) {
-  const tok  = await getBCToken();
-  // shipToAddresses zit niet in REST API v2.0 → ODataV4 gebruiken
-  const url  = `${BC_BASE}/${BC_TENANT}/${BC_ENV}/ODataV4/Company('Verpa')/ShipToAddress?$filter=Customer_No eq '${encodeURIComponent(klantNr)}'&$select=Code,Name,Address,City,Post_Code`;
-  const r = await fetch(url, { headers: { Authorization: `Bearer ${tok}`, Accept: 'application/json' } });
+  const tok       = await getBCToken();
+  const companyId = await getBCCompanyId();
+  // Custom Verpa API page (verpa-bc-extension)
+  const url = `${BC_BASE}/${BC_TENANT}/${BC_ENV}/api/verpa/klachten/v1.0/companies(${companyId})/shipToAddresses?$filter=customerNo eq '${klantNr.replace(/'/g, "''")}'&$select=code,name,address,city,postCode`;
+  const r = await fetch(url, { headers: { Authorization: `Bearer ${tok}` } });
   if (!r.ok) return [];
   const data = await r.json();
-  // ODataV4 gebruikt andere veldnamen dan REST API
   return (data.value || []).map(a => ({
-    code:        a.Code,
-    displayName: a.Name,
-    addressLine1: a.Address,
-    city:        a.City,
-    postalCode:  a.Post_Code,
+    code:         a.code,
+    displayName:  a.name,
+    addressLine1: a.address,
+    city:         a.city,
+    postalCode:   a.postCode,
   }));
 }
 
@@ -832,6 +832,47 @@ document.addEventListener('click', e => {
     if (sug) sug.classList.add('hidden');
   }
 });
+
+/* ══════════════════ BC SYNC ══════════════════ */
+async function bcSyncKlacht(klacht) {
+  const tok       = await getBCToken();
+  const companyId = await getBCCompanyId();
+  const url       = `${BC_BASE}/${BC_TENANT}/${BC_ENV}/api/verpa/klachten/v1.0/companies(${companyId})/klachten`;
+
+  const body = {
+    dossiernummer:  klacht.dossiernummer,
+    klantnummer:    klacht.klantnummer,
+    datumMelding:   klacht.datumMelding,
+    typeKlacht:     klacht.typeKlacht,
+    omschrijving:   klacht.omschrijving,
+    factuurnummer:  klacht.factuurnummer,
+    bedrag:         klacht.bedrag,
+    status:         'Wachtend op goedkeuring',
+    melder:         klacht.melder,
+    melderNaam:     klacht.melderNaam,
+    straat:         klacht.straat,
+    postcode:       klacht.postcode,
+    gemeente:       klacht.gemeente,
+    leveradresCode: klacht.leveradresCode,
+    sharePointId:   klacht.sharePointId,
+  };
+
+  const r = await fetch(url, {
+    method: 'POST',
+    headers: {
+      Authorization:  `Bearer ${tok}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(body),
+  });
+
+  if (!r.ok) {
+    const err = await r.json().catch(() => ({}));
+    throw new Error(err?.error?.message || `BC POST mislukt: ${r.status}`);
+  }
+
+  return await r.json();
+}
 
 /* ══════════════════ FORM ══════════════════ */
 let selectedFiles = [];
@@ -1037,7 +1078,7 @@ async function submitKlacht() {
   try {
     const dossiernummer = await generateDossierNumber();
 
-    await spCreateItem({
+    const spItem = await spCreateItem({
       ...fields,
       Dossiernummer: dossiernummer,
       Status:        'Wachtend op goedkeuring',
@@ -1046,6 +1087,24 @@ async function submitKlacht() {
       MelderNaam:    currentUser.name,
       Artikelregels: JSON.stringify(artikelregels),
     });
+
+    // BC sync – na SharePoint, zodat dataverlies onmogelijk is
+    bcSyncKlacht({
+      dossiernummer,
+      klantnummer:    fields.Klantnummer,
+      datumMelding:   new Date().toISOString(),
+      typeKlacht:     fields.TypeKlacht,
+      omschrijving:   fields.Omschrijving,
+      factuurnummer:  fields.Factuurnummer,
+      bedrag:         fields.Bedrag,
+      straat:         fields.Straat,
+      postcode:       fields.Postcode,
+      gemeente:       fields.Gemeente,
+      melder:         currentUser.email,
+      melderNaam:     currentUser.name,
+      leveradresCode: document.getElementById('bcLeveradresSelect')?.value || '',
+      sharePointId:   String(spItem?.id || ''),
+    }).catch(e => console.warn('BC sync mislukt (niet kritiek):', e.message));
 
     document.getElementById('successDossier').textContent = ` Dossiernummer: ${dossiernummer}`;
     show('formSuccess');
