@@ -1062,6 +1062,86 @@ function resetForm() {
 }
 
 /* ══════════════════ ARTIKELREGELS ══════════════════ */
+/* ══════════════════ BC ARTIKELZOEKER ══════════════════ */
+let artZoekTimers = {};
+
+async function bcZoekArtikelen(zoekterm) {
+  const tok       = await getBCToken();
+  const companyId = await getBCCompanyId();
+  const term      = zoekterm.replace(/'/g, "''");
+  const select    = 'id,number,displayName,baseUnitOfMeasureCode,unitPrice,description';
+  const base      = `${BC_BASE}/${BC_TENANT}/${BC_ENV}/api/v2.0/companies(${companyId})/items`;
+  const headers   = { Authorization: `Bearer ${tok}` };
+
+  const [r1, r2] = await Promise.all([
+    fetch(`${base}?$filter=startswith(number,'${term}')&$top=8&$select=${select}`, { headers }),
+    fetch(`${base}?$filter=contains(displayName,'${term}')&$top=8&$select=${select}`, { headers }),
+  ]);
+
+  const [d1, d2] = await Promise.all([
+    r1.ok ? r1.json() : { value: [] },
+    r2.ok ? r2.json() : { value: [] },
+  ]);
+
+  const seen = new Set();
+  return [...d1.value, ...d2.value].filter(a => {
+    if (seen.has(a.number)) return false;
+    seen.add(a.number);
+    return true;
+  }).slice(0, 10);
+}
+
+function artZoekDebounce(rowId, waarde) {
+  updateArtTotaal();
+  clearTimeout(artZoekTimers[rowId]);
+  const sug = document.getElementById(`art-sug-${rowId}`);
+  if (waarde.trim().length < 2) { sug.classList.add('hidden'); return; }
+  artZoekTimers[rowId] = setTimeout(() => artZoekVoerUit(rowId, waarde), 320);
+}
+
+async function artZoekVoerUit(rowId, waarde) {
+  const sug = document.getElementById(`art-sug-${rowId}`);
+  if (!sug) return;
+  sug.innerHTML = '<div class="art-sug-item art-sug-leeg">Zoeken…</div>';
+  sug.classList.remove('hidden');
+  try {
+    const artikelen = await bcZoekArtikelen(waarde.trim());
+    if (!artikelen.length) {
+      sug.innerHTML = '<div class="art-sug-item art-sug-leeg">Geen artikelen gevonden</div>';
+      return;
+    }
+    sug.innerHTML = artikelen.map(a => `
+      <div class="art-sug-item" onmousedown="artSelecteer(${rowId},${JSON.stringify(a).replace(/"/g,'&quot;')})">
+        <div class="art-sug-nr">${esc(a.number)}</div>
+        <div class="art-sug-naam">${esc(a.displayName)}</div>
+        <div class="art-sug-adres">${esc(a.baseUnitOfMeasureCode||'')} · € ${(a.unitPrice||0).toFixed(2)}</div>
+      </div>
+    `).join('');
+  } catch (e) {
+    sug.innerHTML = '<div class="art-sug-item art-sug-leeg">BC niet beschikbaar</div>';
+  }
+}
+
+function artSelecteer(rowId, artikel) {
+  const tr   = document.getElementById(`art-row-${rowId}`);
+  if (!tr) return;
+  const set  = (field, val) => { const el = tr.querySelector(`[data-field="${field}"]`); if (el) { if (el.tagName === 'SELECT') { [...el.options].forEach(o => { if (o.value === val) o.selected = true; }); } else el.value = val; } };
+  set('artnr', artikel.number);
+  set('naam',  artikel.displayName);
+  // prijs NIET automatisch invullen — melder vult zelf in
+  // UOM matchen
+  const uomMap = { 'ST':'ST','EA':'ST','DS':'DS','KG':'KG','LT':'LT','M2':'M2','PAL':'PAL' };
+  const uom = uomMap[artikel.baseUnitOfMeasureCode] || 'ST';
+  set('uom', uom);
+  artSluitDropdown(rowId);
+  updateArtTotaal();
+}
+
+function artSluitDropdown(rowId) {
+  const sug = document.getElementById(`art-sug-${rowId}`);
+  if (sug) sug.classList.add('hidden');
+}
+
 let artRowId = 0;
 
 function addArtRow() {
@@ -1070,7 +1150,15 @@ function addArtRow() {
   const tr = document.createElement('tr');
   tr.id = 'art-row-' + id;
   tr.innerHTML = `
-    <td><input class="art-input" placeholder="bijv. VB-4421" oninput="updateArtTotaal()" data-field="artnr" /></td>
+    <td style="position:relative">
+      <div class="art-zoek-wrap">
+        <input class="art-input" placeholder="bijv. VB-4421"
+          oninput="this.value=this.value.toUpperCase();artZoekDebounce(${id},this.value)"
+          onblur="setTimeout(()=>artSluitDropdown(${id}),200)"
+          data-field="artnr" autocomplete="off" />
+        <div id="art-sug-${id}" class="art-suggesties hidden"></div>
+      </div>
+    </td>
     <td><input class="art-input" placeholder="Artikelnaam" oninput="updateArtTotaal()" data-field="naam" /></td>
     <td>
       <select class="art-select" onchange="updateArtTotaal()" data-field="uom">
