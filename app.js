@@ -81,13 +81,32 @@ async function getBCCompanyId() {
 async function bcZoekKlanten(zoekterm) {
   const tok       = await getBCToken();
   const companyId = await getBCCompanyId();
-  const filter    = `startswith(number,'${zoekterm.replace(/'/g, "''")}') or contains(displayName,'${zoekterm.replace(/'/g, "''")}')`;
+  const term      = zoekterm.replace(/'/g, "''");
   const select    = 'id,number,displayName,email,phoneNumber,addressLine1,city,postalCode';
-  const url       = `${BC_BASE}/${BC_TENANT}/${BC_ENV}/api/v2.0/companies(${companyId})/customers?$filter=${encodeURIComponent(filter)}&$top=12&$select=${select}`;
-  const r = await fetch(url, { headers: { Authorization: `Bearer ${tok}` } });
-  if (!r.ok) throw new Error(`BC klanten: ${r.status}`);
-  const data = await r.json();
-  return data.value;
+  const base      = `${BC_BASE}/${BC_TENANT}/${BC_ENV}/api/v2.0/companies(${companyId})/customers`;
+
+  const headers = { Authorization: `Bearer ${tok}` };
+
+  // BC ondersteunt geen 'or' over verschillende velden → twee aparte calls
+  const [r1, r2] = await Promise.all([
+    fetch(`${base}?$filter=${encodeURIComponent("startswith(number,'" + term + "')")}&$top=8&$select=${select}`, { headers }),
+    fetch(`${base}?$filter=${encodeURIComponent("contains(displayName,'" + term + "')")}&$top=8&$select=${select}`, { headers }),
+  ]);
+
+  if (!r1.ok && !r2.ok) throw new Error(`BC klanten: ${r1.status}`);
+
+  const [d1, d2] = await Promise.all([
+    r1.ok ? r1.json() : { value: [] },
+    r2.ok ? r2.json() : { value: [] },
+  ]);
+
+  // Samenvoegen zonder duplicaten op klantnummer
+  const seen = new Set();
+  return [...d1.value, ...d2.value].filter(k => {
+    if (seen.has(k.number)) return false;
+    seen.add(k.number);
+    return true;
+  }).slice(0, 12);
 }
 
 const BC_DEMO_KLANTEN = [
