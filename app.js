@@ -1073,18 +1073,21 @@ async function bcZoekArtikelen(zoekterm) {
   const base      = `${BC_BASE}/${BC_TENANT}/${BC_ENV}/api/v2.0/companies(${companyId})/items`;
   const headers   = { Authorization: `Bearer ${tok}` };
 
-  const [r1, r2] = await Promise.all([
+  // BC items: twee aparte calls, contains op displayName én description
+  const [r1, r2, r3] = await Promise.all([
     fetch(`${base}?$filter=startswith(number,'${term}')&$top=8&$select=${select}`, { headers }),
     fetch(`${base}?$filter=contains(displayName,'${term}')&$top=8&$select=${select}`, { headers }),
+    fetch(`${base}?$filter=contains(description,'${term}')&$top=8&$select=${select}`, { headers }),
   ]);
 
-  const [d1, d2] = await Promise.all([
+  const results = await Promise.all([
     r1.ok ? r1.json() : { value: [] },
     r2.ok ? r2.json() : { value: [] },
+    r3.ok ? r3.json() : { value: [] },
   ]);
 
   const seen = new Set();
-  return [...d1.value, ...d2.value].filter(a => {
+  return results.flatMap(d => d.value || []).filter(a => {
     if (seen.has(a.number)) return false;
     seen.add(a.number);
     return true;
