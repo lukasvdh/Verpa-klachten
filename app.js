@@ -1124,16 +1124,13 @@ async function artZoekVoerUit(rowId, waarde) {
 }
 
 function artSelecteer(rowId, artikel) {
-  const tr   = document.getElementById(`art-row-${rowId}`);
+  const tr  = document.getElementById(`art-row-${rowId}`);
   if (!tr) return;
-  const set  = (field, val) => { const el = tr.querySelector(`[data-field="${field}"]`); if (el) { if (el.tagName === 'SELECT') { [...el.options].forEach(o => { if (o.value === val) o.selected = true; }); } else el.value = val; } };
+  const set = (field, val) => { const el = tr.querySelector(`[data-field="${field}"]`); if (el) el.value = val || ''; };
   set('artnr', artikel.number);
   set('naam',  artikel.displayName);
+  set('uom',   artikel.baseUnitOfMeasureCode || 'ST');
   // prijs NIET automatisch invullen — melder vult zelf in
-  // UOM matchen
-  const uomMap = { 'ST':'ST','EA':'ST','DS':'DS','KG':'KG','LT':'LT','M2':'M2','PAL':'PAL' };
-  const uom = uomMap[artikel.baseUnitOfMeasureCode] || 'ST';
-  set('uom', uom);
   artSluitDropdown(rowId);
   updateArtTotaal();
 }
@@ -1162,9 +1159,7 @@ function addArtRow() {
     </td>
     <td><input class="art-input" placeholder="Artikelnaam" oninput="updateArtTotaal()" data-field="naam" /></td>
     <td>
-      <select class="art-select" onchange="updateArtTotaal()" data-field="uom">
-        <option>ST</option><option>DS</option><option>KG</option><option>LT</option><option>M2</option><option>PAL</option>
-      </select>
+      <input class="art-input" data-field="uom" value="ST" oninput="updateArtTotaal()" style="text-transform:uppercase;width:60px" maxlength="10" />
     </td>
     <td><input class="art-input" type="number" min="0" step="1" value="1" oninput="updateArtTotaal()" data-field="aantal" style="text-align:right" /></td>
     <td>
@@ -1209,7 +1204,7 @@ function getArtRegels() {
   return Array.from(rows).map(tr => ({
     artnr: tr.querySelector('[data-field="artnr"]')?.value.trim() || '',
     naam:  tr.querySelector('[data-field="naam"]')?.value.trim()  || '',
-    uom:   tr.querySelector('[data-field="uom"]')?.value          || 'ST',
+    uom:   (tr.querySelector('[data-field="uom"]')?.value || 'ST').toUpperCase(),
     aantal: parseFloat(tr.querySelector('[data-field="aantal"]')?.value) || 0,
     prijs:  parseFloat(tr.querySelector('[data-field="prijs"]')?.value)  || 0,
   }));
