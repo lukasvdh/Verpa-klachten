@@ -734,14 +734,21 @@ function toonSuggesties(klanten, isDemo, container) {
 
 let bcHuidigeLeveradressen = [];
 
-async function bcHaalLeveradressen(klantId) {
-  const tok       = await getBCToken();
-  const companyId = await getBCCompanyId();
-  const url = `${BC_BASE}/${BC_TENANT}/${BC_ENV}/api/v2.0/companies(${companyId})/customers(${klantId})/shipToAddresses?$select=code,displayName,addressLine1,city,postalCode`;
-  const r = await fetch(url, { headers: { Authorization: `Bearer ${tok}` } });
+async function bcHaalLeveradressen(klantNr) {
+  const tok  = await getBCToken();
+  // shipToAddresses zit niet in REST API v2.0 → ODataV4 gebruiken
+  const url  = `${BC_BASE}/${BC_TENANT}/${BC_ENV}/ODataV4/Company('Verpa')/ShipToAddress?$filter=Customer_No eq '${encodeURIComponent(klantNr)}'&$select=Code,Name,Address,City,Post_Code`;
+  const r = await fetch(url, { headers: { Authorization: `Bearer ${tok}`, Accept: 'application/json' } });
   if (!r.ok) return [];
   const data = await r.json();
-  return data.value || [];
+  // ODataV4 gebruikt andere veldnamen dan REST API
+  return (data.value || []).map(a => ({
+    code:        a.Code,
+    displayName: a.Name,
+    addressLine1: a.Address,
+    city:        a.City,
+    postalCode:  a.Post_Code,
+  }));
 }
 
 function bcVulAdres(straat, postcode, gemeente) {
@@ -785,9 +792,9 @@ async function bcSelecteerKlant(klant) {
   leveradresSelect.innerHTML = '<option value="">— Facturatieadres gebruiken —</option>';
   bcHuidigeLeveradressen = [];
 
-  if (klant.id) {
+  if (klant.number) {
     try {
-      const adressen = await bcHaalLeveradressen(klant.id);
+      const adressen = await bcHaalLeveradressen(klant.number);
       if (adressen.length) {
         bcHuidigeLeveradressen = adressen;
         bcHuidigeLeveradressen._klant = klant; // bewaar voor reset
