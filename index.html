@@ -1010,5 +1010,18 @@ button,input,select,textarea{font-family:inherit;font-size:13.5px}
   <div id="toast" class="toast hidden"></div>
 
 
+<div id="mobileDebug" style="position:fixed;bottom:0;left:0;right:0;background:#fee;color:#900;font-size:11px;padding:8px;z-index:9999;display:none;max-height:200px;overflow-y:auto;white-space:pre-wrap;word-break:break-all"></div>
+<script>
+window.onerror = function(msg, src, line, col, err) {
+  var d = document.getElementById('mobileDebug');
+  d.style.display = 'block';
+  d.textContent += '[' + line + ':' + col + '] ' + msg + '\n';
+};
+window.addEventListener('unhandledrejection', function(e) {
+  var d = document.getElementById('mobileDebug');
+  d.style.display = 'block';
+  d.textContent += '[Promise] ' + (e.reason?.message || e.reason) + '\n';
+});
+</script>
 </body>
 </html>
