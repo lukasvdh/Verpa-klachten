@@ -1073,17 +1073,15 @@ async function bcZoekArtikelen(zoekterm) {
   const base      = `${BC_BASE}/${BC_TENANT}/${BC_ENV}/api/v2.0/companies(${companyId})/items`;
   const headers   = { Authorization: `Bearer ${tok}` };
 
-  // BC items: twee aparte calls, contains op displayName én description
-  const [r1, r2, r3] = await Promise.all([
+  // BC items: startswith op number én displayName (contains werkt niet op items)
+  const [r1, r2] = await Promise.all([
     fetch(`${base}?$filter=startswith(number,'${term}')&$top=8&$select=${select}`, { headers }),
-    fetch(`${base}?$filter=contains(displayName,'${term}')&$top=8&$select=${select}`, { headers }),
-    fetch(`${base}?$filter=contains(description,'${term}')&$top=8&$select=${select}`, { headers }),
+    fetch(`${base}?$filter=startswith(displayName,'${term}')&$top=8&$select=${select}`, { headers }),
   ]);
 
   const results = await Promise.all([
     r1.ok ? r1.json() : { value: [] },
     r2.ok ? r2.json() : { value: [] },
-    r3.ok ? r3.json() : { value: [] },
   ]);
 
   const seen = new Set();
