@@ -839,15 +839,31 @@ async function bcSyncKlacht(klacht) {
   const companyId = await getBCCompanyId();
   const url       = `${BC_BASE}/${BC_TENANT}/${BC_ENV}/api/verpa/klachten/v1.0/companies(${companyId})/klachten`;
 
+  // Map app-waarden naar BC enum-namen
+  const typeMap = {
+    'Foute bestelling': 'FouteBestellling',
+    'Beschadiging':     'Beschadiging',
+    'Prijsverschil':    'Prijsverschil',
+    'Administratief':   'Administratief',
+    'Kwaliteit':        'Kwaliteit',
+  };
+
+  const statusMap = {
+    'Wachtend op goedkeuring': 'Open',
+    'Goedgekeurd':             'Goedgekeurd',
+    'Geweigerd':               'Geweigerd',
+    'Geklasseerd':             'Geklasseerd',
+  };
+
   const body = {
     dossiernummer:  klacht.dossiernummer,
     klantnummer:    klacht.klantnummer,
     datumMelding:   klacht.datumMelding,
-    typeKlacht:     klacht.typeKlacht,
+    typeKlacht:     typeMap[klacht.typeKlacht] || klacht.typeKlacht,
     omschrijving:   klacht.omschrijving,
     factuurnummer:  klacht.factuurnummer,
     bedrag:         klacht.bedrag,
-    status:         'Wachtend op goedkeuring',
+    status:         statusMap[klacht.status] || 'Open',
     melder:         klacht.melder,
     melderNaam:     klacht.melderNaam,
     straat:         klacht.straat,
@@ -1104,6 +1120,7 @@ async function submitKlacht() {
       melderNaam:     currentUser.name,
       leveradresCode: document.getElementById('bcLeveradresSelect')?.value || '',
       sharePointId:   String(spItem?.id || ''),
+      status:         'Wachtend op goedkeuring',
     }).catch(e => console.warn('BC sync mislukt (niet kritiek):', e.message));
 
     document.getElementById('successDossier').textContent = ` Dossiernummer: ${dossiernummer}`;
