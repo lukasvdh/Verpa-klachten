@@ -1115,7 +1115,7 @@ async function artZoekVoerUit(rowId, waarde) {
       <div class="art-sug-item" onmousedown="artSelecteer(${rowId},${JSON.stringify(a).replace(/"/g,'&quot;')})">
         <div class="art-sug-nr">${esc(a.number)}</div>
         <div class="art-sug-naam">${esc(a.displayName)}</div>
-        <div class="art-sug-adres">${esc(a.baseUnitOfMeasureCode||'')} · € ${(a.unitPrice||0).toFixed(2)}</div>
+        <div class="art-sug-meta">${esc(a.baseUnitOfMeasureCode||'ST')}</div>
       </div>
     `).join('');
   } catch (e) {
