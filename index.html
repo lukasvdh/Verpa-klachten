@@ -923,6 +923,30 @@ button,input,select,textarea{font-family:inherit;font-size:13.5px}
 
           <div id="importResult" class="hidden"></div>
         </div>
+
+        <!-- BC Sync sectie -->
+        <div class="form-card" style="margin-top:20px">
+          <div class="import-instructions">
+            <h3>📤 Bestaande klachten synchroniseren naar Business Central</h3>
+            <ul>
+              <li>Haalt alle bestaande SharePoint-klachten op</li>
+              <li>POST elk record naar de BC Klachten API</li>
+              <li>Records die al in BC bestaan worden overgeslagen</li>
+              <li>Vereist <strong>API.ReadWrite.All</strong> machtiging in Azure</li>
+            </ul>
+          </div>
+          <div class="form-actions">
+            <button id="btnBCSyncAll" class="btn btn-primary" onclick="bcSyncAlleKlachten()">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 11-2.12-9.36L23 10"/></svg>
+              Alle klachten naar BC synchroniseren
+            </button>
+          </div>
+          <div id="bcSyncProgress" class="import-progress hidden">
+            <div class="progress-bar"><div id="bcSyncFill" class="progress-fill"></div></div>
+            <span id="bcSyncLabel">0 / 0 records verwerkt</span>
+          </div>
+          <div id="bcSyncResult" class="hidden" style="margin-top:12px"></div>
+        </div>
       </section>
 
     </main>

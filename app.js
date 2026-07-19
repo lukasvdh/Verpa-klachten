@@ -884,10 +884,101 @@ async function bcSyncKlacht(klacht) {
 
   if (!r.ok) {
     const err = await r.json().catch(() => ({}));
-    throw new Error(err?.error?.message || `BC POST mislukt: ${r.status}`);
+    const msg = err?.error?.message || `BC POST mislukt: ${r.status}`;
+    // 409 = record bestaat al → als "already exists" behandelen
+    if (r.status === 409 || msg.includes('already exists') || msg.includes('al bestaat')) {
+      throw new Error('already exists');
+    }
+    throw new Error(msg);
   }
 
   return await r.json();
+}
+
+/* ══════════════════ BC SYNC ALLE KLACHTEN ══════════════════ */
+async function bcSyncAlleKlachten() {
+  const btn      = document.getElementById('btnBCSyncAll');
+  const progress = document.getElementById('bcSyncProgress');
+  const fill     = document.getElementById('bcSyncFill');
+  const label    = document.getElementById('bcSyncLabel');
+  const result   = document.getElementById('bcSyncResult');
+
+  btn.disabled = true;
+  btn.textContent = 'Bezig…';
+  progress.classList.remove('hidden');
+  result.classList.add('hidden');
+
+  try {
+    // 1. Haal alle klachten op uit SharePoint
+    const siteId = await getSiteId();
+    const listId = await getListId();
+    const tok    = await refreshToken();
+
+    let all = [], url = `https://graph.microsoft.com/v1.0/sites/${siteId}/lists/${listId}/items?$expand=fields&$top=500`;
+    while (url) {
+      const r = await fetch(url, { headers: { Authorization: `Bearer ${tok}` } });
+      const d = await r.json();
+      all = all.concat(d.value || []);
+      url = d['@odata.nextLink'] || null;
+    }
+
+    const totaal = all.length;
+    let geslaagd = 0, overgeslagen = 0, mislukt = 0;
+
+    for (let i = 0; i < all.length; i++) {
+      const f = all[i].fields;
+      const pct = Math.round(((i + 1) / totaal) * 100);
+      fill.style.width = pct + '%';
+      label.textContent = `${i + 1} / ${totaal} records verwerkt`;
+
+      try {
+        await bcSyncKlacht({
+          dossiernummer:  f.Dossiernummer || '',
+          klantnummer:    f.Klantnummer   || '',
+          datumMelding:   f.DatumMelding  || new Date().toISOString(),
+          typeKlacht:     f.TypeKlacht    || '',
+          omschrijving:   f.Omschrijving  || '',
+          factuurnummer:  f.Factuurnummer || '',
+          bedrag:         parseFloat(f.Bedrag) || 0,
+          status:         f.Status        || 'Wachtend op goedkeuring',
+          melder:         f.Melder        || '',
+          melderNaam:     f.MelderNaam    || '',
+          straat:         f.Straat        || '',
+          postcode:       f.Postcode      || '',
+          gemeente:       f.Gemeente      || '',
+          leveradresCode: '',
+          sharePointId:   String(all[i].id || ''),
+        });
+        geslaagd++;
+      } catch (e) {
+        if (e.message && e.message.includes('already exists')) {
+          overgeslagen++;
+        } else {
+          mislukt++;
+          console.warn(`BC sync mislukt voor ${f.Dossiernummer}:`, e.message);
+        }
+      }
+
+      // Kleine pauze om BC niet te overbelasten
+      if (i % 10 === 9) await new Promise(r => setTimeout(r, 500));
+    }
+
+    result.innerHTML = `
+      <div class="alert alert-success">
+        <strong>Synchronisatie voltooid</strong><br>
+        ✅ ${geslaagd} gesynchroniseerd &nbsp;·&nbsp;
+        ⏭ ${overgeslagen} reeds aanwezig &nbsp;·&nbsp;
+        ❌ ${mislukt} mislukt
+      </div>`;
+    result.classList.remove('hidden');
+
+  } catch (e) {
+    result.innerHTML = `<div class="alert alert-error">Fout: ${esc(e.message)}</div>`;
+    result.classList.remove('hidden');
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 11-2.12-9.36L23 10"/></svg> Alle klachten naar BC synchroniseren`;
+  }
 }
 
 /* ══════════════════ FORM ══════════════════ */
