@@ -1069,7 +1069,7 @@ async function bcZoekArtikelen(zoekterm) {
   const tok       = await getBCToken();
   const companyId = await getBCCompanyId();
   const term      = zoekterm.replace(/'/g, "''");
-  const select    = 'id,number,displayName,baseUnitOfMeasureCode,unitPrice,description';
+  const select    = 'id,number,displayName,baseUnitOfMeasureCode,unitPrice';
   const base      = `${BC_BASE}/${BC_TENANT}/${BC_ENV}/api/v2.0/companies(${companyId})/items`;
   const headers   = { Authorization: `Bearer ${tok}` };
 
