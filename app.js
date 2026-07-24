@@ -618,7 +618,7 @@ function openDetail(id){
   } else if(k.Bedrag){artHtml='<div style="margin-bottom:16px"><div class="d-lbl" style="margin-bottom:4px">Bedrag (excl. BTW)</div><div class="d-val big">\u20ac '+fmtB(k.Bedrag)+'</div></div>';}
   var rejectHtml=k.WeigeringReden?'<div class="reject-box"><div class="d-lbl">Reden weigering</div><div class="d-val" style="font-weight:400;margin-top:4px">'+k.WeigeringReden+'</div></div>':'';
   var cnHtml=k.CreditnotaNr?'<div><div class="d-lbl">Creditnota</div><div class="d-val" style="font-family:monospace;font-weight:700;color:var(--green)">'+k.CreditnotaNr+'</div></div>':'';
-  document.getElementById('modalBody').innerHTML='<div class="detail-grid"><div><div class="d-lbl">Dossiernummer</div><div class="d-val" style="font-family:monospace;font-size:15px;font-weight:700;color:var(--navy)">'+k.Dossiernummer+'</div></div><div><div class="d-lbl">Goedkeuringsstatus</div><div class="d-val">'+statusBadge(k.Status)+'</div></div><div class="d-full"><div class="d-lbl">Behandelstatus</div><div class="behandel-seg" id="behandelSeg">'+['Nieuw','In behandeling','Afgehandeld'].map(function(s){var cur=k.BehandelStatus||'Nieuw';var cls='behandel-seg-btn bs-btn-'+s.replace(/ /g,'-').toLowerCase()+(cur===s?' active':'');return'<button class="'+cls+'" onclick="updateBehandelStatus(\''+k.id+'\',\''+s+'\',this)"><span class="seg-dot"></span>'+s+'</button>';}).join('')+'</div></div><div><div class="d-lbl">Datum melding</div><div class="d-val">'+fmtDate(k.DatumMelding)+'</div></div><div><div class="d-lbl">Type klacht</div><div class="d-val">'+(typePill[k.TypeKlacht]||k.TypeKlacht)+'</div></div><div><div class="d-lbl">Klantnaam</div><div class="d-val">'+k.Klantnaam+'</div></div><div><div class="d-lbl">Klantnummer</div><div class="d-val">'+k.Klantnummer+'</div></div><div><div class="d-lbl">Factuurnummer</div><div class="d-val">'+k.Factuurnummer+'</div></div>'+(k.BeoordeeldDoor?'<div><div class="d-lbl">Beoordeeld door</div><div class="d-val">'+k.BeoordeeldDoor+'</div></div>':'')+cnHtml+'<div class="d-full"><div class="d-lbl">Omschrijving</div><div class="d-val desc">'+k.Omschrijving+'</div></div><div><div class="d-lbl">Ingediend door</div><div class="d-val">'+(k.MelderNaam||'\u2013')+'</div></div></div>'+artHtml+rejectHtml;
+  document.getElementById('modalBody').innerHTML='<div class="detail-grid"><div><div class="d-lbl">Dossiernummer</div><div class="d-val" style="font-family:monospace;font-size:15px;font-weight:700;color:var(--navy)">'+k.Dossiernummer+'</div></div><div><div class="d-lbl">Goedkeuringsstatus</div><div class="d-val">'+statusBadge(k.Status)+'</div></div><div class="d-full"><div class="d-lbl">Behandelstatus</div><div class="behandel-seg" id="behandelSeg">'+['Nieuw','In behandeling','Afgehandeld'].map(function(s){var cur=k.BehandelStatus||'Nieuw';var cls='behandel-seg-btn bs-btn-'+s.replace(/ /g,'-').toLowerCase()+(cur===s?' active':'');return'<button class="'+cls+'" onclick="updateBehandelStatus(\''+k.id+'\',\''+s+'\',this)"><span class="seg-dot"></span>'+s+'</button>';}).join('')+'</div></div><div><div class="d-lbl">Datum melding</div><div class="d-val">'+fmtDate(k.DatumMelding)+'</div></div><div><div class="d-lbl">Type klacht</div><div class="d-val">'+(typePill[k.TypeKlacht]||k.TypeKlacht)+'</div></div><div><div class="d-lbl">Klantnaam</div><div class="d-val">'+k.Klantnaam+'</div></div><div><div class="d-lbl">Klantnummer</div><div class="d-val">'+k.Klantnummer+'</div></div><div><div class="d-lbl">Factuurnummer</div><div class="d-val">'+k.Factuurnummer+'</div></div>'+(k.BeoordeeldDoor?'<div><div class="d-lbl">Beoordeeld door</div><div class="d-val">'+k.BeoordeeldDoor+'</div></div>':'')+'<div><div class="d-lbl">Datum afhandeling</div><div class="d-val" id="datumAfhandelingVal">'+(k.DatumAfhandeling?new Date(k.DatumAfhandeling).toLocaleDateString('nl-BE'):'\u2013')+'</div></div>'+cnHtml+'<div class="d-full"><div class="d-lbl">Omschrijving</div><div class="d-val desc">'+k.Omschrijving+'</div></div><div><div class="d-lbl">Ingediend door</div><div class="d-val">'+(k.MelderNaam||'\u2013')+'</div></div></div>'+artHtml+rejectHtml;
   var foot=document.getElementById('modalFooter');
   var retourBtn='<button class="btn btn-secondary" onclick="printRetour(\''+k.id+'\')">&#128196; Retourkaart</button>';
   var delBtn=currentUser.isAdmin?'<button class="btn btn-danger" style="margin-left:auto" onclick="deleteKlacht(\''+k.id+'\',\''+k.Dossiernummer+'\')" title="Verwijderen">&#128465; Verwijderen</button>':'';
@@ -1322,27 +1322,41 @@ async function updateBehandelStatus(itemId, nieuweStatus, btnEl) {
   }
 
   const k = allKlachten.find(x => x.id === itemId);
-  if (k) k.BehandelStatus = nieuweStatus;
+  const datumAfhandeling = nieuweStatus === 'Afgehandeld' ? new Date().toISOString() : null;
+
+  if (k) {
+    k.BehandelStatus    = nieuweStatus;
+    k.DatumAfhandeling  = datumAfhandeling;
+  }
+
+  // Datum label in modal bijwerken zonder modal te sluiten
+  const datumEl = document.getElementById('datumAfhandelingVal');
+  if (datumEl) datumEl.textContent = datumAfhandeling ? new Date(datumAfhandeling).toLocaleDateString('nl-BE') : '–';
+
   renderList();
 
   // 1. SharePoint – altijd
+  const spFields = { BehandelStatus: nieuweStatus };
+  if (datumAfhandeling)       spFields.DatumAfhandeling = datumAfhandeling;
+  else if (nieuweStatus !== 'Afgehandeld') spFields.DatumAfhandeling = null;
+
   try {
-    await spUpdateItem(itemId, { BehandelStatus: nieuweStatus });
+    await spUpdateItem(itemId, spFields);
   } catch (e) {
     showToast('SharePoint fout: ' + e.message, 'error');
-    return; // stop als SP mislukt
+    return;
   }
 
-  // 2. Business Central – PATCH op bestaand record via dossiernummer
+  // 2. Business Central – PATCH
   if (k) {
-    bcPatchBehandelStatus(k.Dossiernummer, nieuweStatus)
+    bcPatchBehandelStatus(k.Dossiernummer, nieuweStatus, datumAfhandeling)
       .catch(e => console.warn('BC behandelstatus sync mislukt (niet kritiek):', e.message));
   }
 
   showToast('Behandelstatus opgeslagen: ' + nieuweStatus, 'success');
 }
 
-async function bcPatchBehandelStatus(dossiernummer, nieuweStatus) {
+async function bcPatchBehandelStatus(dossiernummer, nieuweStatus, datumAfhandeling) {
   const tok       = await getBCToken();
   if (!tok) return;
   const companyId = await getBCCompanyId();
@@ -1373,7 +1387,10 @@ async function bcPatchBehandelStatus(dossiernummer, nieuweStatus) {
       'Content-Type': 'application/json',
       'If-Match':     record['@odata.etag'] || '*',
     },
-    body: JSON.stringify({ behandelStatus: behandelMap[nieuweStatus] || nieuweStatus }),
+    body: JSON.stringify({
+      behandelStatus:   behandelMap[nieuweStatus] || nieuweStatus,
+      datumAfhandeling: datumAfhandeling || null,
+    }),
   });
   if (!patchResp.ok) {
     const err = await patchResp.json().catch(() => ({}));
@@ -1397,8 +1414,9 @@ function exportToExcel() {
     'Omschrijving':     k.Omschrijving || '',
     'Bedrag excl. BTW': typeof k.Bedrag === 'number' ? k.Bedrag : parseFloat(k.Bedrag) || 0,
     'Status':           k.Status || '',
-    'Behandelstatus':   k.BehandelStatus || 'Nieuw',
-    'Melder':           k.MelderNaam || k.Melder || '',
+    'Behandelstatus':    k.BehandelStatus || 'Nieuw',
+    'Datum afhandeling': k.DatumAfhandeling ? formatDateExcel(k.DatumAfhandeling) : '',
+    'Melder':            k.MelderNaam || k.Melder || '',
     'Beoordeeld door':  k.BeoordeeldDoor || '',
     'Datum beoordeling': k.DatumGoedkeuring ? formatDateExcel(k.DatumGoedkeuring) : '',
     'Reden weigering':  k.WeigeringReden || '',
@@ -1410,7 +1428,7 @@ function exportToExcel() {
   ws['!cols'] = [
     {wch:14}, {wch:14}, {wch:28}, {wch:14}, {wch:16},
     {wch:18}, {wch:50}, {wch:18}, {wch:24}, {wch:18},
-    {wch:24}, {wch:22}, {wch:18}, {wch:40},
+    {wch:18}, {wch:24}, {wch:22}, {wch:18}, {wch:40},
   ];
 
   // Valuta opmaak kolom H (index 7 = Bedrag)

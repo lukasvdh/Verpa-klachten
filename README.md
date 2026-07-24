@@ -37,6 +37,7 @@ Maak op de Verpa SharePoint site een lijst genaamd **`KlachtenMeldingen`** aan m
 | `WeigeringReden`    | Meerdere regels     | Nee       |
 | `IsHistorisch`      | Ja/Nee              | Nee       |
 | `BehandelStatus`    | Keuze               | Nee       |
+| `DatumAfhandeling`  | Datum en tijd       | Nee       |
 
 **Keuze-opties voor `Status`:**
 - Wachtend op goedkeuring
