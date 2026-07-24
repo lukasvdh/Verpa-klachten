@@ -1797,7 +1797,7 @@ function printRetour(itemId) {
   </div>
 
   <div class="footer">
-    Verpa Benelux NV &nbsp;·&nbsp; Laakdal &amp; Stora &nbsp;·&nbsp; verpabenelux.be &nbsp;·&nbsp; Dossier ${esc(k.Dossiernummer)}
+    Verpa Benelux NV &nbsp;·&nbsp; www.verpa.be &nbsp;·&nbsp; Dossier ${esc(k.Dossiernummer)}
   </div>
 
   <script>window.onload = function(){ window.print(); }<\/script>
