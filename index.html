@@ -152,6 +152,19 @@ button,input,select,textarea{font-family:inherit;font-size:13.5px}
 .s-goedgekeurd{background:var(--green-bg);color:var(--green)}
 .s-geweigerd{background:var(--red-bg);color:var(--red)}
 .s-geklasseerd{background:var(--gray-bg);color:var(--gray)}
+/* Behandelstatus segmented control */
+.behandel-seg{display:inline-flex;gap:6px;align-items:center;flex-wrap:wrap;margin-top:2px}
+.behandel-seg-btn{display:inline-flex;align-items:center;gap:6px;padding:4px 12px;border-radius:20px;font-size:12px;font-weight:600;cursor:pointer;border:1.5px solid #E2E8F0;background:#F1F5F9;color:#64748B;transition:background .15s,color .15s,border-color .15s,box-shadow .15s;white-space:nowrap;line-height:1.5}
+.behandel-seg-btn .seg-dot{width:7px;height:7px;border-radius:50%;background:currentColor;opacity:.4;flex-shrink:0;transition:opacity .15s}
+.behandel-seg-btn:hover:not(.active){background:#E2E8F0;color:#334155;border-color:#CBD5E1}
+.behandel-seg-btn.bs-btn-nieuw.active{background:#EFF6FF;color:#1D4ED8;border-color:#BFDBFE;box-shadow:0 1px 3px rgba(0,0,0,.08)}
+.behandel-seg-btn.bs-btn-in-behandeling.active{background:#FEF9C3;color:#854D0E;border-color:#FDE68A;box-shadow:0 1px 3px rgba(0,0,0,.08)}
+.behandel-seg-btn.bs-btn-afgehandeld.active{background:#DCFCE7;color:#15803D;border-color:#BBF7D0;box-shadow:0 1px 3px rgba(0,0,0,.08)}
+.behandel-seg-btn.active .seg-dot{opacity:1}
+/* Behandelstatus list badges */
+.bs-nieuw{background:#EFF6FF;color:#1D4ED8}
+.bs-in-behandeling{background:#FEF9C3;color:#854D0E}
+.bs-afgehandeld{background:#DCFCE7;color:#15803D}
 .fase-pill{padding:2px 8px;border-radius:5px;font-size:11px;font-weight:700}
 .fp-ontvangst{background:#DBEAFE;color:#1E40AF}
 .fp-voorraad{background:var(--amber-bg);color:#92400E}
