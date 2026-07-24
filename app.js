@@ -1314,20 +1314,70 @@ async function submitKlacht() {
 
 /* ══════════════════ BEHANDELSTATUS UPDATE ══════════════════ */
 async function updateBehandelStatus(itemId, nieuweStatus, btnEl) {
-  // Optimistisch: wissel actieve knop direct
+  // Optimistisch: wissel actieve knop direct zodat UI niet wacht op netwerk
   if (btnEl) {
     const seg = btnEl.closest('.behandel-seg');
     if (seg) seg.querySelectorAll('.behandel-seg-btn').forEach(function(b){ b.classList.remove('active'); });
     btnEl.classList.add('active');
   }
+
+  const k = allKlachten.find(x => x.id === itemId);
+  if (k) k.BehandelStatus = nieuweStatus;
+  renderList();
+
+  // 1. SharePoint – altijd
   try {
     await spUpdateItem(itemId, { BehandelStatus: nieuweStatus });
-    const k = allKlachten.find(x => x.id === itemId);
-    if (k) k.BehandelStatus = nieuweStatus;
-    renderList();
-    showToast('Behandelstatus: ' + nieuweStatus, 'success');
   } catch (e) {
-    showToast('Fout bij bijwerken behandelstatus: ' + e.message, 'error');
+    showToast('SharePoint fout: ' + e.message, 'error');
+    return; // stop als SP mislukt
+  }
+
+  // 2. Business Central – PATCH op bestaand record via dossiernummer
+  if (k) {
+    bcPatchBehandelStatus(k.Dossiernummer, nieuweStatus)
+      .catch(e => console.warn('BC behandelstatus sync mislukt (niet kritiek):', e.message));
+  }
+
+  showToast('Behandelstatus opgeslagen: ' + nieuweStatus, 'success');
+}
+
+async function bcPatchBehandelStatus(dossiernummer, nieuweStatus) {
+  const tok       = await getBCToken();
+  if (!tok) return;
+  const companyId = await getBCCompanyId();
+
+  // Behandelstatus map naar BC enum
+  const behandelMap = {
+    'Nieuw':          'Nieuw',
+    'In behandeling': 'InBehandeling',
+    'Afgehandeld':    'Afgehandeld',
+  };
+
+  // Zoek het BC-record op via dossiernummer
+  const zoekUrl = `${BC_BASE}/${BC_TENANT}/${BC_ENV}/api/verpa/klachten/v1.0/companies(${companyId})/klachten?$filter=dossiernummer eq '${encodeURIComponent(dossiernummer)}'&$select=id,etag`;
+  const zoekResp = await fetch(zoekUrl, {
+    headers: { Authorization: `Bearer ${tok}` },
+  });
+  if (!zoekResp.ok) throw new Error(`BC zoek mislukt: ${zoekResp.status}`);
+  const zoekData = await zoekResp.json();
+  const record = (zoekData.value || [])[0];
+  if (!record) throw new Error(`BC record niet gevonden voor ${dossiernummer}`);
+
+  // PATCH enkel de behandelStatus
+  const patchUrl = `${BC_BASE}/${BC_TENANT}/${BC_ENV}/api/verpa/klachten/v1.0/companies(${companyId})/klachten(${record.id})`;
+  const patchResp = await fetch(patchUrl, {
+    method: 'PATCH',
+    headers: {
+      Authorization:  `Bearer ${tok}`,
+      'Content-Type': 'application/json',
+      'If-Match':     record['@odata.etag'] || '*',
+    },
+    body: JSON.stringify({ behandelStatus: behandelMap[nieuweStatus] || nieuweStatus }),
+  });
+  if (!patchResp.ok) {
+    const err = await patchResp.json().catch(() => ({}));
+    throw new Error(err?.error?.message || `BC PATCH mislukt: ${patchResp.status}`);
   }
 }
 
