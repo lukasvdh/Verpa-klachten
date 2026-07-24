@@ -260,12 +260,15 @@ button,input,select,textarea{font-family:inherit;font-size:13.5px}
 .bs-in-behandeling{background:#FEF9C3;color:#854D0E}
 .bs-afgehandeld{background:#DCFCE7;color:#15803D}
 /* Behandelstatus segmented control */
-.behandel-seg{display:inline-flex;border:1.5px solid var(--border);border-radius:10px;overflow:hidden;background:var(--gray-bg);padding:3px;gap:3px}
-.behandel-seg-btn{border:none;background:transparent;padding:5px 14px;border-radius:7px;font-size:12px;font-weight:600;cursor:pointer;color:var(--text-muted);transition:background .15s,color .15s,box-shadow .15s;white-space:nowrap}
-.behandel-seg-btn:hover{background:var(--surface);color:var(--text)}
-.behandel-seg-btn.bs-btn-nieuw.active{background:#EFF6FF;color:#1D4ED8;box-shadow:0 1px 3px rgba(0,0,0,.1)}
-.behandel-seg-btn.bs-btn-in-behandeling.active{background:#FEF9C3;color:#854D0E;box-shadow:0 1px 3px rgba(0,0,0,.1)}
-.behandel-seg-btn.bs-btn-afgehandeld.active{background:#DCFCE7;color:#15803D;box-shadow:0 1px 3px rgba(0,0,0,.1)}
+.behandel-seg{display:inline-flex;gap:6px;align-items:center;flex-wrap:wrap}
+.behandel-seg-btn{display:inline-flex;align-items:center;gap:6px;padding:4px 12px;border-radius:20px;font-size:12px;font-weight:600;cursor:pointer;border:1.5px solid transparent;background:#F1F5F9;color:#64748B;transition:background .15s,color .15s,border-color .15s,box-shadow .15s;white-space:nowrap;line-height:1.5}
+.behandel-seg-btn .seg-dot{width:7px;height:7px;border-radius:50%;background:currentColor;opacity:.5;flex-shrink:0;transition:opacity .15s}
+.behandel-seg-btn:hover{background:#E2E8F0;color:#334155}
+.behandel-seg-btn.bs-btn-nieuw.active{background:#EFF6FF;color:#1D4ED8;border-color:#BFDBFE}
+.behandel-seg-btn.bs-btn-in-behandeling.active{background:#FEF9C3;color:#854D0E;border-color:#FDE68A}
+.behandel-seg-btn.bs-btn-afgehandeld.active{background:#DCFCE7;color:#15803D;border-color:#BBF7D0}
+.behandel-seg-btn.active .seg-dot{opacity:1}
+.behandel-seg-btn.active{box-shadow:0 1px 3px rgba(0,0,0,.08)}
 /* Fase pills */
 .fase-pill{padding:2px 8px;border-radius:5px;font-size:11px;font-weight:700}
 .fp-ontvangst{background:#DBEAFE;color:#1E40AF}
