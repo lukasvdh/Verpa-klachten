@@ -94,6 +94,9 @@ button,input,select,textarea{font-family:inherit;font-size:13.5px}
 .s-goedgekeurd{background:var(--green-bg);color:var(--green)}
 .s-geweigerd{background:var(--red-bg);color:var(--red)}
 .s-geklasseerd{background:var(--gray-bg);color:var(--gray)}
+.bs-nieuw{background:#EFF6FF;color:#1D4ED8}
+.bs-in-behandeling{background:#FEF9C3;color:#854D0E}
+.bs-afgehandeld{background:#DCFCE7;color:#15803D}
 .fase-pill{padding:2px 8px;border-radius:5px;font-size:11px;font-weight:700}
 .fp-ontvangst{background:#DBEAFE;color:#1E40AF}
 .fp-voorraad{background:var(--amber-bg);color:#92400E}
@@ -252,6 +255,10 @@ button,input,select,textarea{font-family:inherit;font-size:13.5px}
 .s-goedgekeurd{background:#DCFCE7;color:#16A34A}
 .s-geweigerd{background:#FEE2E2;color:#DC2626}
 .s-geklasseerd{background:#F1F5F9;color:#64748B}
+/* Behandelstatus badges */
+.bs-nieuw{background:#EFF6FF;color:#1D4ED8}
+.bs-in-behandeling{background:#FEF9C3;color:#854D0E}
+.bs-afgehandeld{background:#DCFCE7;color:#15803D}
 /* Fase pills */
 .fase-pill{padding:2px 8px;border-radius:5px;font-size:11px;font-weight:700}
 .fp-ontvangst{background:#DBEAFE;color:#1E40AF}

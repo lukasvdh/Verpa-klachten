@@ -36,12 +36,18 @@ Maak op de Verpa SharePoint site een lijst genaamd **`KlachtenMeldingen`** aan m
 | `DatumGoedkeuring`  | Datum en tijd       | Nee       |
 | `WeigeringReden`    | Meerdere regels     | Nee       |
 | `IsHistorisch`      | Ja/Nee              | Nee       |
+| `BehandelStatus`    | Keuze               | Nee       |
 
 **Keuze-opties voor `Status`:**
 - Wachtend op goedkeuring
 - Goedgekeurd
 - Geweigerd
 - Geklasseerd
+
+**Keuze-opties voor `BehandelStatus`:**
+- Nieuw
+- In behandeling
+- Afgehandeld
 
 **Keuze-opties voor `TypeKlacht`:**
 - Foute bestelling

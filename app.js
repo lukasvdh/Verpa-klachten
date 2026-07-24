@@ -481,7 +481,7 @@ function renderList(){
           +artBadge+cnBadge
         +'</div>'
       +'</div>'
-      +'<div class="melding-right"><span class="melding-bedrag">\u20ac '+formatBedrag(k.Bedrag)+'</span>'+sb+'</div>'
+      +'<div class="melding-right"><span class="melding-bedrag">\u20ac '+formatBedrag(k.Bedrag)+'</span>'+sb+behandelStatusBadge(k.BehandelStatus)+'</div>'
       +'</div>';
   }).join('');
 }
@@ -618,7 +618,7 @@ function openDetail(id){
   } else if(k.Bedrag){artHtml='<div style="margin-bottom:16px"><div class="d-lbl" style="margin-bottom:4px">Bedrag (excl. BTW)</div><div class="d-val big">\u20ac '+fmtB(k.Bedrag)+'</div></div>';}
   var rejectHtml=k.WeigeringReden?'<div class="reject-box"><div class="d-lbl">Reden weigering</div><div class="d-val" style="font-weight:400;margin-top:4px">'+k.WeigeringReden+'</div></div>':'';
   var cnHtml=k.CreditnotaNr?'<div><div class="d-lbl">Creditnota</div><div class="d-val" style="font-family:monospace;font-weight:700;color:var(--green)">'+k.CreditnotaNr+'</div></div>':'';
-  document.getElementById('modalBody').innerHTML='<div class="detail-grid"><div><div class="d-lbl">Dossiernummer</div><div class="d-val" style="font-family:monospace;font-size:15px;font-weight:700;color:var(--navy)">'+k.Dossiernummer+'</div></div><div><div class="d-lbl">Status</div><div class="d-val">'+statusBadge(k.Status)+'</div></div><div><div class="d-lbl">Datum melding</div><div class="d-val">'+fmtDate(k.DatumMelding)+'</div></div><div><div class="d-lbl">Type klacht</div><div class="d-val">'+(typePill[k.TypeKlacht]||k.TypeKlacht)+'</div></div><div><div class="d-lbl">Klantnaam</div><div class="d-val">'+k.Klantnaam+'</div></div><div><div class="d-lbl">Klantnummer</div><div class="d-val">'+k.Klantnummer+'</div></div><div><div class="d-lbl">Factuurnummer</div><div class="d-val">'+k.Factuurnummer+'</div></div>'+(k.BeoordeeldDoor?'<div><div class="d-lbl">Beoordeeld door</div><div class="d-val">'+k.BeoordeeldDoor+'</div></div>':'')+cnHtml+'<div class="d-full"><div class="d-lbl">Omschrijving</div><div class="d-val desc">'+k.Omschrijving+'</div></div><div><div class="d-lbl">Ingediend door</div><div class="d-val">'+(k.MelderNaam||'\u2013')+'</div></div></div>'+artHtml+rejectHtml;
+  document.getElementById('modalBody').innerHTML='<div class="detail-grid"><div><div class="d-lbl">Dossiernummer</div><div class="d-val" style="font-family:monospace;font-size:15px;font-weight:700;color:var(--navy)">'+k.Dossiernummer+'</div></div><div><div class="d-lbl">Goedkeuringsstatus</div><div class="d-val">'+statusBadge(k.Status)+'</div></div><div class="d-full"><div class="d-lbl">Behandelstatus</div><div class="d-val" style="display:flex;align-items:center;gap:10px">'+behandelStatusBadge(k.BehandelStatus)+'<select id="behandelStatusSelect" style="border:1px solid var(--border);border-radius:6px;padding:4px 8px;font-size:13px;color:var(--text);background:var(--surface);cursor:pointer" onchange="updateBehandelStatus(\''+k.id+'\',this.value)"><option value="Nieuw"'+((!k.BehandelStatus||k.BehandelStatus==='Nieuw')?' selected':'')+'">Nieuw</option><option value="In behandeling"'+(k.BehandelStatus==='In behandeling'?' selected':'')+'">In behandeling</option><option value="Afgehandeld"'+(k.BehandelStatus==='Afgehandeld'?' selected':'')+'">Afgehandeld</option></select></div></div><div><div class="d-lbl">Datum melding</div><div class="d-val">'+fmtDate(k.DatumMelding)+'</div></div><div><div class="d-lbl">Type klacht</div><div class="d-val">'+(typePill[k.TypeKlacht]||k.TypeKlacht)+'</div></div><div><div class="d-lbl">Klantnaam</div><div class="d-val">'+k.Klantnaam+'</div></div><div><div class="d-lbl">Klantnummer</div><div class="d-val">'+k.Klantnummer+'</div></div><div><div class="d-lbl">Factuurnummer</div><div class="d-val">'+k.Factuurnummer+'</div></div>'+(k.BeoordeeldDoor?'<div><div class="d-lbl">Beoordeeld door</div><div class="d-val">'+k.BeoordeeldDoor+'</div></div>':'')+cnHtml+'<div class="d-full"><div class="d-lbl">Omschrijving</div><div class="d-val desc">'+k.Omschrijving+'</div></div><div><div class="d-lbl">Ingediend door</div><div class="d-val">'+(k.MelderNaam||'\u2013')+'</div></div></div>'+artHtml+rejectHtml;
   var foot=document.getElementById('modalFooter');
   var retourBtn='<button class="btn btn-secondary" onclick="printRetour(\''+k.id+'\')">&#128196; Retourkaart</button>';
   var delBtn=currentUser.isAdmin?'<button class="btn btn-danger" style="margin-left:auto" onclick="deleteKlacht(\''+k.id+'\',\''+k.Dossiernummer+'\')" title="Verwijderen">&#128465; Verwijderen</button>':'';
@@ -1271,9 +1271,10 @@ async function submitKlacht() {
 
     const spItem = await spCreateItem({
       ...fields,
-      Dossiernummer: dossiernummer,
-      Status:        'Wachtend op goedkeuring',
-      DatumMelding:  new Date().toISOString(),
+      Dossiernummer:  dossiernummer,
+      Status:         'Wachtend op goedkeuring',
+      BehandelStatus: 'Nieuw',
+      DatumMelding:   new Date().toISOString(),
       Melder:        currentUser.email,
       MelderNaam:    currentUser.name,
       Artikelregels: JSON.stringify(artikelregels),
@@ -1311,6 +1312,20 @@ async function submitKlacht() {
   }
 }
 
+/* ══════════════════ BEHANDELSTATUS UPDATE ══════════════════ */
+async function updateBehandelStatus(itemId, nieuweStatus) {
+  try {
+    await spUpdateItem(itemId, { BehandelStatus: nieuweStatus });
+    // Update lokale data zodat de lijst meteen klopt
+    const k = allKlachten.find(x => x.id === itemId);
+    if (k) k.BehandelStatus = nieuweStatus;
+    renderList();
+    showToast('Behandelstatus bijgewerkt: ' + nieuweStatus, 'success');
+  } catch (e) {
+    showToast('Fout bij bijwerken behandelstatus: ' + e.message, 'error');
+  }
+}
+
 /* ══════════════════ EXCEL EXPORT ══════════════════ */
 document.getElementById('btnExport').addEventListener('click', exportToExcel);
 
@@ -1327,6 +1342,7 @@ function exportToExcel() {
     'Omschrijving':     k.Omschrijving || '',
     'Bedrag excl. BTW': typeof k.Bedrag === 'number' ? k.Bedrag : parseFloat(k.Bedrag) || 0,
     'Status':           k.Status || '',
+    'Behandelstatus':   k.BehandelStatus || 'Nieuw',
     'Melder':           k.MelderNaam || k.Melder || '',
     'Beoordeeld door':  k.BeoordeeldDoor || '',
     'Datum beoordeling': k.DatumGoedkeuring ? formatDateExcel(k.DatumGoedkeuring) : '',
@@ -1338,8 +1354,8 @@ function exportToExcel() {
   // Opmaak: brede kolommen
   ws['!cols'] = [
     {wch:14}, {wch:14}, {wch:28}, {wch:14}, {wch:16},
-    {wch:18}, {wch:50}, {wch:18}, {wch:24}, {wch:24},
-    {wch:22}, {wch:18}, {wch:40},
+    {wch:18}, {wch:50}, {wch:18}, {wch:24}, {wch:18},
+    {wch:24}, {wch:22}, {wch:18}, {wch:40},
   ];
 
   // Valuta opmaak kolom H (index 7 = Bedrag)
@@ -1544,6 +1560,16 @@ function formatBedrag(val) {
   return n.toLocaleString('nl-BE', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
+function behandelStatusBadge(status) {
+  const map = {
+    'Nieuw':          ['bs-nieuw',          '🆕'],
+    'In behandeling': ['bs-in-behandeling', '🔄'],
+    'Afgehandeld':    ['bs-afgehandeld',    '✅'],
+  };
+  const [cls, icon] = map[status] || ['bs-nieuw', '🆕'];
+  return `<span class="status-badge ${cls}"><span class="sb-dot"></span>${esc(status || 'Nieuw')}</span>`;
+}
+
 function statusPill(status) {
   const map = {
     'Wachtend op goedkeuring': ['pill-pending',  '⏳'],
@@ -1646,7 +1672,6 @@ function printRetour(itemId) {
       <div class="info-grid">
         <div class="info-item"><label>Klantnaam</label><span>${esc(k.Klantnaam)}</span></div>
         <div class="info-item"><label>Klantnummer</label><span>${esc(k.Klantnummer)}</span></div>
-        ${k.Straat ? '<div class="info-item" style="grid-column:1/-1"><label>Adres</label><span>' + esc(k.Straat) + '<br>' + esc((k.Postcode||'') + ' ' + (k.Gemeente||'')).trim() + '<br>België</span></div>' : ''}
         <div class="info-item"><label>Factuurnummer</label><span>${esc(k.Factuurnummer)}</span></div>
         <div class="info-item"><label>Datum melding</label><span>${datumFormatted}</span></div>
         <div class="info-item"><label>Type klacht</label><span class="type-pill">${esc(k.TypeKlacht)}</span></div>
@@ -1662,11 +1687,6 @@ function printRetour(itemId) {
         België
       </div>
     </div>` : ''}
-  </div>
-
-  <div class="section">
-    <div class="section-title">Omschrijving</div>
-    <div class="omschrijving-box">${esc(k.Omschrijving)}</div>
   </div>
 
   <div class="section">
