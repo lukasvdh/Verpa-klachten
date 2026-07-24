@@ -618,7 +618,7 @@ function openDetail(id){
   } else if(k.Bedrag){artHtml='<div style="margin-bottom:16px"><div class="d-lbl" style="margin-bottom:4px">Bedrag (excl. BTW)</div><div class="d-val big">\u20ac '+fmtB(k.Bedrag)+'</div></div>';}
   var rejectHtml=k.WeigeringReden?'<div class="reject-box"><div class="d-lbl">Reden weigering</div><div class="d-val" style="font-weight:400;margin-top:4px">'+k.WeigeringReden+'</div></div>':'';
   var cnHtml=k.CreditnotaNr?'<div><div class="d-lbl">Creditnota</div><div class="d-val" style="font-family:monospace;font-weight:700;color:var(--green)">'+k.CreditnotaNr+'</div></div>':'';
-  document.getElementById('modalBody').innerHTML='<div class="detail-grid"><div><div class="d-lbl">Dossiernummer</div><div class="d-val" style="font-family:monospace;font-size:15px;font-weight:700;color:var(--navy)">'+k.Dossiernummer+'</div></div><div><div class="d-lbl">Goedkeuringsstatus</div><div class="d-val">'+statusBadge(k.Status)+'</div></div><div class="d-full"><div class="d-lbl">Behandelstatus</div><div class="d-val" style="display:flex;align-items:center;gap:10px">'+behandelStatusBadge(k.BehandelStatus)+'<select id="behandelStatusSelect" style="border:1px solid var(--border);border-radius:6px;padding:4px 8px;font-size:13px;color:var(--text);background:var(--surface);cursor:pointer" onchange="updateBehandelStatus(\''+k.id+'\',this.value)"><option value="Nieuw"'+((!k.BehandelStatus||k.BehandelStatus==='Nieuw')?' selected':'')+'">Nieuw</option><option value="In behandeling"'+(k.BehandelStatus==='In behandeling'?' selected':'')+'">In behandeling</option><option value="Afgehandeld"'+(k.BehandelStatus==='Afgehandeld'?' selected':'')+'">Afgehandeld</option></select></div></div><div><div class="d-lbl">Datum melding</div><div class="d-val">'+fmtDate(k.DatumMelding)+'</div></div><div><div class="d-lbl">Type klacht</div><div class="d-val">'+(typePill[k.TypeKlacht]||k.TypeKlacht)+'</div></div><div><div class="d-lbl">Klantnaam</div><div class="d-val">'+k.Klantnaam+'</div></div><div><div class="d-lbl">Klantnummer</div><div class="d-val">'+k.Klantnummer+'</div></div><div><div class="d-lbl">Factuurnummer</div><div class="d-val">'+k.Factuurnummer+'</div></div>'+(k.BeoordeeldDoor?'<div><div class="d-lbl">Beoordeeld door</div><div class="d-val">'+k.BeoordeeldDoor+'</div></div>':'')+cnHtml+'<div class="d-full"><div class="d-lbl">Omschrijving</div><div class="d-val desc">'+k.Omschrijving+'</div></div><div><div class="d-lbl">Ingediend door</div><div class="d-val">'+(k.MelderNaam||'\u2013')+'</div></div></div>'+artHtml+rejectHtml;
+  document.getElementById('modalBody').innerHTML='<div class="detail-grid"><div><div class="d-lbl">Dossiernummer</div><div class="d-val" style="font-family:monospace;font-size:15px;font-weight:700;color:var(--navy)">'+k.Dossiernummer+'</div></div><div><div class="d-lbl">Goedkeuringsstatus</div><div class="d-val">'+statusBadge(k.Status)+'</div></div><div class="d-full"><div class="d-lbl">Behandelstatus</div><div class="behandel-seg" id="behandelSeg">'+['Nieuw','In behandeling','Afgehandeld'].map(function(s){var cur=k.BehandelStatus||'Nieuw';var cls='behandel-seg-btn bs-btn-'+s.replace(/ /g,'-').toLowerCase()+(cur===s?' active':'');return'<button class="'+cls+'" onclick="updateBehandelStatus(\''+k.id+'\',\''+s+'\',this)">'+s+'</button>';}).join('')+'</div></div><div><div class="d-lbl">Datum melding</div><div class="d-val">'+fmtDate(k.DatumMelding)+'</div></div><div><div class="d-lbl">Type klacht</div><div class="d-val">'+(typePill[k.TypeKlacht]||k.TypeKlacht)+'</div></div><div><div class="d-lbl">Klantnaam</div><div class="d-val">'+k.Klantnaam+'</div></div><div><div class="d-lbl">Klantnummer</div><div class="d-val">'+k.Klantnummer+'</div></div><div><div class="d-lbl">Factuurnummer</div><div class="d-val">'+k.Factuurnummer+'</div></div>'+(k.BeoordeeldDoor?'<div><div class="d-lbl">Beoordeeld door</div><div class="d-val">'+k.BeoordeeldDoor+'</div></div>':'')+cnHtml+'<div class="d-full"><div class="d-lbl">Omschrijving</div><div class="d-val desc">'+k.Omschrijving+'</div></div><div><div class="d-lbl">Ingediend door</div><div class="d-val">'+(k.MelderNaam||'\u2013')+'</div></div></div>'+artHtml+rejectHtml;
   var foot=document.getElementById('modalFooter');
   var retourBtn='<button class="btn btn-secondary" onclick="printRetour(\''+k.id+'\')">&#128196; Retourkaart</button>';
   var delBtn=currentUser.isAdmin?'<button class="btn btn-danger" style="margin-left:auto" onclick="deleteKlacht(\''+k.id+'\',\''+k.Dossiernummer+'\')" title="Verwijderen">&#128465; Verwijderen</button>':'';
@@ -1313,14 +1313,19 @@ async function submitKlacht() {
 }
 
 /* ══════════════════ BEHANDELSTATUS UPDATE ══════════════════ */
-async function updateBehandelStatus(itemId, nieuweStatus) {
+async function updateBehandelStatus(itemId, nieuweStatus, btnEl) {
+  // Optimistisch: wissel actieve knop direct
+  if (btnEl) {
+    const seg = btnEl.closest('.behandel-seg');
+    if (seg) seg.querySelectorAll('.behandel-seg-btn').forEach(function(b){ b.classList.remove('active'); });
+    btnEl.classList.add('active');
+  }
   try {
     await spUpdateItem(itemId, { BehandelStatus: nieuweStatus });
-    // Update lokale data zodat de lijst meteen klopt
     const k = allKlachten.find(x => x.id === itemId);
     if (k) k.BehandelStatus = nieuweStatus;
     renderList();
-    showToast('Behandelstatus bijgewerkt: ' + nieuweStatus, 'success');
+    showToast('Behandelstatus: ' + nieuweStatus, 'success');
   } catch (e) {
     showToast('Fout bij bijwerken behandelstatus: ' + e.message, 'error');
   }
