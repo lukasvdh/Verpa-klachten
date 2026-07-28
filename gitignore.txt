@@ -1,0 +1,22 @@
+# Mac
+.DS_Store
+
+# Editor
+.vscode/
+.idea/
+
+# Dependencies
+node_modules/
+
+# Environment & secrets
+.env
+.env.local
+.env*.local
+
+# Cloudflare
+.wrangler/
+dist/
+
+# Lokale testbestanden met echte config
+config.local.js
+config.local.json

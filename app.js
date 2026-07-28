@@ -1273,12 +1273,18 @@ async function submitKlacht() {
       ...fields,
       Dossiernummer:  dossiernummer,
       Status:         'Wachtend op goedkeuring',
-      BehandelStatus: 'Nieuw',
       DatumMelding:   new Date().toISOString(),
       Melder:        currentUser.email,
       MelderNaam:    currentUser.name,
       Artikelregels: JSON.stringify(artikelregels),
     });
+
+    // BehandelStatus en DatumAfhandeling zijn nieuwe kolommen – apart patchen
+    // zodat een ontbrekende kolom de indiening niet blokkeert.
+    if (spItem?.id) {
+      spUpdateItem(spItem.id, { BehandelStatus: 'Nieuw' })
+        .catch(e => console.warn('BehandelStatus patch mislukt (kolom nog niet aangemaakt?):', e.message));
+    }
 
     // BC sync – na SharePoint, zodat dataverlies onmogelijk is
     bcSyncKlacht({
