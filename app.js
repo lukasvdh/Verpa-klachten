@@ -702,6 +702,7 @@ async function loadReview() {
 /* ══════════════════ APPROVE / REJECT ══════════════════ */
 async function approveKlacht(itemId, fromReview = false) {
   try {
+    const oudStatus = (allKlachten.find(x => x.id === itemId) || {}).Status || '–';
     await spUpdateItem(itemId, {
       Status: 'Goedgekeurd',
       DatumGoedkeuring: new Date().toISOString(),
@@ -711,6 +712,10 @@ async function approveKlacht(itemId, fromReview = false) {
     closeModal();
     await loadDashboard();
     if (fromReview) await loadReview();
+    sendWijzigingsmail(itemId, [
+      { veld: 'Status', oud: oudStatus, nieuw: 'Goedgekeurd' },
+      { veld: 'Beoordeeld door', oud: '–', nieuw: currentUser.email },
+    ]);
   } catch (e) {
     showToast('Fout bij goedkeuren: ' + e.message, 'error');
   }
@@ -730,8 +735,10 @@ async function confirmReject() {
     return;
   }
 
+  const rejectId = currentRejectId;
   try {
-    await spUpdateItem(currentRejectId, {
+    const oudStatus = (allKlachten.find(x => x.id === rejectId) || {}).Status || '–';
+    await spUpdateItem(rejectId, {
       Status: 'Geweigerd',
       WeigeringReden: reason,
       DatumGoedkeuring: new Date().toISOString(),
@@ -743,6 +750,10 @@ async function confirmReject() {
     currentRejectId = null;
     await loadDashboard();
     if (document.getElementById('viewReview').classList.contains('active')) await loadReview();
+    sendWijzigingsmail(rejectId, [
+      { veld: 'Status', oud: oudStatus, nieuw: 'Geweigerd' },
+      { veld: 'Reden weigering', oud: '–', nieuw: reason },
+    ]);
   } catch (e) {
     showToast('Fout bij weigeren: ' + e.message, 'error');
   }
@@ -805,10 +816,16 @@ async function deleteKlacht(itemId, dossiernummer) {
 async function saveCreditnota(itemId) {
   const val = document.getElementById('creditnota-input')?.value.trim();
   try {
+    const oudCN = (allKlachten.find(x => x.id === itemId) || {}).CreditnotaNr || '–';
     await spUpdateItem(itemId, { CreditnotaNr: val });
     showToast('Creditnota opgeslagen.', 'success');
     closeModal();
     await loadDashboard();
+    if (val && val !== oudCN) {
+      sendWijzigingsmail(itemId, [
+        { veld: 'Creditnota', oud: oudCN, nieuw: val },
+      ]);
+    }
   } catch(e) {
     showToast('Fout bij opslaan: ' + e.message, 'error');
   }
@@ -1487,6 +1504,7 @@ async function updateBehandelStatus(itemId, nieuweStatus, btnEl) {
   }
 
   const k = allKlachten.find(x => x.id === itemId);
+  const oudeBehandelStatus = k ? (k.BehandelStatus || 'Nieuw') : 'Nieuw';
   const datumAfhandeling = nieuweStatus === 'Afgehandeld' ? new Date().toISOString() : null;
 
   if (k) {
@@ -1519,6 +1537,11 @@ async function updateBehandelStatus(itemId, nieuweStatus, btnEl) {
   }
 
   showToast('Behandelstatus opgeslagen: ' + nieuweStatus, 'success');
+
+  // 3. Wijzigingsmail naar melder
+  sendWijzigingsmail(itemId, [
+    { veld: 'Behandelstatus', oud: oudeBehandelStatus, nieuw: nieuweStatus },
+  ]);
 }
 
 async function bcPatchBehandelStatus(dossiernummer, nieuweStatus, datumAfhandeling) {
@@ -1829,6 +1852,339 @@ function showToast(msg, type = '') {
 
 /* ══════════════════ START ══════════════════ */
 init();
+
+
+/* ══════════════════ RETOURKAART HTML BUILDER ══════════════════
+   Gedeelde helper: genereert dezelfde HTML als printRetour()
+   maar zonder window.open – zodat we hem als bijlage kunnen sturen.
+   ════════════════════════════════════════════════════════════ */
+function buildRetourHtml(k) {
+  var artikelregels = [];
+  try { artikelregels = JSON.parse(k.Artikelregels || '[]').filter(function(r){ return r.artnr || r.naam; }); } catch(e){}
+
+  var totaal  = artikelregels.reduce(function(s,r){ return s + (parseFloat(r.aantal)||0) * (parseFloat(r.prijs)||0); }, 0);
+  var fmtTot  = totaal.toLocaleString('nl-BE', {minimumFractionDigits:2, maximumFractionDigits:2});
+  var qrUrl   = 'https://verpa-klachten.pages.dev/?dossier=' + encodeURIComponent(k.Dossiernummer);
+  var qrSrc   = 'https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=' + encodeURIComponent(qrUrl);
+  var datumFormatted = k.DatumMelding ? new Date(k.DatumMelding).toLocaleDateString('nl-BE') : '–';
+
+  var artRows = artikelregels.map(function(r){
+    var a = parseFloat(r.aantal)||0; var p = parseFloat(String(r.prijs||0).replace(',','.'))||0;
+    var lijn = (a * p).toLocaleString('nl-BE', {minimumFractionDigits:2, maximumFractionDigits:2});
+    return '<tr><td>' + esc(r.artnr||'–') + '</td><td>' + esc(r.naam||'–') + '</td>'
+      + '<td style="text-align:center">' + esc(r.uom||'ST') + '</td>'
+      + '<td style="text-align:right">' + a + '</td>'
+      + '<td style="text-align:right">€ ' + p.toLocaleString('nl-BE',{minimumFractionDigits:2,maximumFractionDigits:2}) + '</td>'
+      + '<td style="text-align:right">€ ' + lijn + '</td></tr>';
+  }).join('');
+
+  return `<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="UTF-8"/>
+<title>Retour ${esc(k.Dossiernummer)}</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Helvetica Neue', Arial, sans-serif; font-size: 12px; color: #111; background: #fff; padding: 28px 32px; }
+  .header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 24px; padding-bottom: 16px; border-bottom: 2px solid #1B3F6A; }
+  .header-left .sub { font-size: 11px; color: #64748B; margin-top: 2px; }
+  .dossier-badge { background: #1B3F6A; color: #fff; font-size: 15px; font-weight: 700; padding: 6px 14px; border-radius: 6px; letter-spacing: .5px; }
+  .section { margin-bottom: 20px; }
+  .section-title { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: .1em; color: #94A3B8; margin-bottom: 8px; }
+  .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 24px; }
+  .info-item label { font-size: 9px; text-transform: uppercase; letter-spacing: .07em; color: #94A3B8; display: block; margin-bottom: 2px; }
+  .info-item span { font-size: 13px; font-weight: 600; color: #0F172A; }
+  table { width: 100%; border-collapse: collapse; font-size: 11.5px; }
+  thead tr { background: #1B3F6A; color: #fff; }
+  thead th { padding: 7px 10px; text-align: left; font-weight: 700; font-size: 10px; text-transform: uppercase; letter-spacing: .05em; }
+  tbody tr:nth-child(even) { background: #F8FAFC; }
+  tbody td { padding: 6px 10px; border-bottom: 1px solid #E2E8F0; }
+  .totaal-row td { font-weight: 700; font-size: 13px; border-top: 2px solid #1B3F6A; border-bottom: none; padding-top: 8px; }
+  .bottom { display: flex; gap: 24px; margin-top: 24px; padding-top: 16px; border-top: 1px solid #E2E8F0; }
+  .sign-box { flex: 1; border: 1.5px dashed #CBD5E1; border-radius: 8px; padding: 12px 16px; min-height: 100px; }
+  .sign-box .sign-label { font-size: 9px; text-transform: uppercase; letter-spacing: .08em; color: #94A3B8; font-weight: 700; margin-bottom: 4px; }
+  .sign-box .sign-name { font-size: 11px; color: #64748B; margin-top: 6px; }
+  .qr-box { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+  .qr-box img { width: 110px; height: 110px; }
+  .qr-box .qr-label { font-size: 9px; color: #94A3B8; text-align: center; max-width: 110px; line-height: 1.4; }
+  .type-pill { display: inline-block; background: #EBF3FA; color: #1B3F6A; font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 20px; }
+  .footer { margin-top: 20px; font-size: 9px; color: #94A3B8; text-align: center; border-top: 1px solid #E2E8F0; padding-top: 10px; }
+  @media print { body { padding: 16px 20px; } @page { margin: 12mm; } }
+</style>
+</head>
+<body>
+  <div class="header">
+    <div class="header-left">
+      <div style="background:#1B3F6A;border-radius:8px;padding:8px 16px;display:inline-block;margin-bottom:6px">
+        <img src="https://verpa.be/wp-content/uploads/2023/03/cropped-Transparant-logo-Verpa_Lukas-1-2048x594.png" alt="Verpa" style="height:36px;display:block" />
+      </div>
+      <div class="sub">Verkoop Retour Verzending</div>
+    </div>
+    <div style="text-align:right">
+      <div class="dossier-badge">${esc(k.Dossiernummer)}</div>
+      <div style="font-size:10px;color:#64748B;margin-top:6px">Opgemaakt op ${new Date().toLocaleDateString('nl-BE')}</div>
+    </div>
+  </div>
+  <div class="section" style="display:flex;gap:24px">
+    <div style="flex:1">
+      <div class="section-title">Klantgegevens</div>
+      <div class="info-grid">
+        <div class="info-item"><label>Klantnaam</label><span>${esc(k.Klantnaam)}</span></div>
+        <div class="info-item"><label>Klantnummer</label><span>${esc(k.Klantnummer)}</span></div>
+        <div class="info-item"><label>Factuurnummer</label><span>${esc(k.Factuurnummer)}</span></div>
+        <div class="info-item"><label>Datum melding</label><span>${datumFormatted}</span></div>
+        <div class="info-item"><label>Type klacht</label><span class="type-pill">${esc(k.TypeKlacht)}</span></div>
+        <div class="info-item"><label>Ingediend door</label><span>${esc(k.MelderNaam||k.Melder)}</span></div>
+      </div>
+    </div>
+    ${k.Straat ? `<div style="min-width:160px;background:#F8FAFC;border:1px solid #E2E8F0;border-radius:8px;padding:14px 16px">
+      <div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:#94A3B8;margin-bottom:8px">Retouradres klant</div>
+      <div style="font-size:13px;font-weight:600;line-height:1.7;color:#0F172A">
+        ${esc(k.Klantnaam)}<br>${esc(k.Straat)}<br>${esc((k.Postcode||'') + ' ' + (k.Gemeente||'')).trim()}<br>België
+      </div></div>` : ''}
+  </div>
+  <div class="section">
+    <div class="section-title">Te retourneren artikelen</div>
+    <table>
+      <thead><tr>
+        <th>Artikelnr.</th><th>Artikelnaam</th><th style="text-align:center">UOM</th>
+        <th style="text-align:right">Aantal</th><th style="text-align:right">Prijs/st.</th><th style="text-align:right">Totaal</th>
+      </tr></thead>
+      <tbody>
+        ${artRows}
+        <tr class="totaal-row">
+          <td colspan="5" style="text-align:right">Totaal (excl. BTW)</td>
+          <td style="text-align:right">€ ${fmtTot}</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="bottom">
+    <div class="sign-box" style="flex:2">
+      <div class="sign-label">Handtekening klant voor ontvangst retour</div>
+      <div style="height:60px"></div>
+      <div class="sign-name">Naam: _____________________________ &nbsp;&nbsp; Datum: _______________</div>
+    </div>
+    <div class="sign-box" style="flex:1.2">
+      <div class="sign-label">Handtekening chauffeur</div>
+      <div style="height:60px"></div>
+      <div class="sign-name">Naam: _____________________________</div>
+    </div>
+    <div class="qr-box">
+      <img src="${qrSrc}" alt="QR code dossier" />
+      <div class="qr-label">Scan voor digitaal dossier ${esc(k.Dossiernummer)}</div>
+    </div>
+  </div>
+  <div class="footer">Verpa Benelux NV &nbsp;·&nbsp; www.verpa.be &nbsp;·&nbsp; Dossier ${esc(k.Dossiernummer)}</div>
+</body>
+</html>`;
+}
+
+/* ══════════════════ WIJZIGINGSMAIL MELDER ══════════════════
+   Stuurt een mail naar de melder van het ticket bij elke statuswijziging.
+   Bevat ticketdetails, de aanpassing en de retourkaart als HTML-bijlage.
+   ════════════════════════════════════════════════════════════ */
+async function sendWijzigingsmail(klachtId, wijzigingen) {
+  try {
+    const tok = await getMailToken();
+    if (!tok) { console.warn('Wijzigingsmail overgeslagen: geen Mail.Send token.'); return; }
+
+    // Haal het volledige klacht-object op uit allKlachten (bevat meest recente state)
+    const k = allKlachten.find(x => x.id === klachtId);
+    if (!k) { console.warn('Wijzigingsmail: klacht niet gevonden in allKlachten'); return; }
+    if (!k.Melder) { console.warn('Wijzigingsmail: geen melder-email op klacht'); return; }
+
+    const datumFmt = k.DatumMelding ? new Date(k.DatumMelding).toLocaleDateString('nl-BE') : '–';
+
+    // Artikelregels tabel voor de mail body
+    let artTabelHtml = '';
+    try {
+      const artRegels = JSON.parse(k.Artikelregels || '[]').filter(r => r.artnr || r.naam);
+      if (artRegels.length) {
+        const artRows = artRegels.map(r => {
+          const a = parseFloat(r.aantal)||0; const p = parseFloat(r.prijs)||0;
+          return `<tr>
+            <td style="padding:6px 10px;border-bottom:1px solid #e2e8f0;font-family:monospace;font-size:12px;color:#1B3F6A">${esc(r.artnr||'–')}</td>
+            <td style="padding:6px 10px;border-bottom:1px solid #e2e8f0">${esc(r.naam||'–')}</td>
+            <td style="padding:6px 10px;border-bottom:1px solid #e2e8f0;text-align:center">${esc(r.uom||'ST')}</td>
+            <td style="padding:6px 10px;border-bottom:1px solid #e2e8f0;text-align:right">${a}</td>
+            <td style="padding:6px 10px;border-bottom:1px solid #e2e8f0;text-align:right">€ ${p.toLocaleString('nl-BE',{minimumFractionDigits:2,maximumFractionDigits:2})}</td>
+            <td style="padding:6px 10px;border-bottom:1px solid #e2e8f0;text-align:right;font-weight:600">€ ${(a*p).toLocaleString('nl-BE',{minimumFractionDigits:2,maximumFractionDigits:2})}</td>
+          </tr>`;
+        }).join('');
+        const totaal = artRegels.reduce((s,r)=>s+(parseFloat(r.aantal)||0)*(parseFloat(r.prijs)||0),0);
+        artTabelHtml = `
+          <div style="margin-bottom:20px">
+            <p style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#94a3b8;margin:0 0 8px">Artikelregels</p>
+            <table style="width:100%;border-collapse:collapse;font-size:12px;border:1px solid #e2e8f0;border-radius:6px;overflow:hidden">
+              <thead><tr style="background:#1B3F6A;color:#fff">
+                <th style="padding:7px 10px;text-align:left;font-size:10px">Artikelnr.</th>
+                <th style="padding:7px 10px;text-align:left;font-size:10px">Naam</th>
+                <th style="padding:7px 10px;text-align:center;font-size:10px">UOM</th>
+                <th style="padding:7px 10px;text-align:right;font-size:10px">Aantal</th>
+                <th style="padding:7px 10px;text-align:right;font-size:10px">Prijs/st.</th>
+                <th style="padding:7px 10px;text-align:right;font-size:10px">Totaal</th>
+              </tr></thead>
+              <tbody>${artRows}</tbody>
+              <tfoot><tr style="background:#f8fafc">
+                <td colspan="5" style="padding:7px 10px;text-align:right;font-size:11px;color:#64748b">Totaal (excl. BTW)</td>
+                <td style="padding:7px 10px;text-align:right;font-weight:700;color:#1B3F6A">€ ${totaal.toLocaleString('nl-BE',{minimumFractionDigits:2,maximumFractionDigits:2})}</td>
+              </tr></tfoot>
+            </table>
+          </div>`;
+      }
+    } catch(e) {}
+
+    // Wijzigingenblok
+    const wijzigingenHtml = wijzigingen.map(w => `
+      <tr>
+        <td style="padding:8px 12px;border-bottom:1px solid #e2e8f0;font-size:12px;color:#64748b;white-space:nowrap">${esc(w.veld)}</td>
+        <td style="padding:8px 12px;border-bottom:1px solid #e2e8f0;font-size:12px;color:#ef4444;text-decoration:line-through">${esc(String(w.oud||'–'))}</td>
+        <td style="padding:8px 12px;border-bottom:1px solid #e2e8f0;font-size:12px;color:#16a34a;font-weight:600">${esc(String(w.nieuw||'–'))}</td>
+      </tr>`).join('');
+
+    const statusKleur = {
+      'Goedgekeurd':  '#16a34a',
+      'Geweigerd':    '#ef4444',
+      'Geklasseerd':  '#64748b',
+      'Wachtend op goedkeuring': '#d97706',
+      'Nieuw':        '#3b82f6',
+      'In behandeling': '#f59e0b',
+      'Afgehandeld':  '#16a34a',
+    };
+    const huidigeStatus = k.Status || '';
+    const kleur = statusKleur[huidigeStatus] || '#1B3F6A';
+
+    const htmlBody = `
+<div style="font-family:'Helvetica Neue',Arial,sans-serif;max-width:620px;margin:0 auto;color:#1a1a2e">
+  <div style="background:#1B3F6A;padding:20px 28px;border-radius:8px 8px 0 0">
+    <img src="https://verpa.be/wp-content/uploads/2023/03/cropped-Transparant-logo-Verpa_Lukas-1-2048x594.png"
+         alt="Verpa" style="height:30px;display:block;margin-bottom:10px" />
+    <p style="color:#93c5fd;font-size:13px;margin:0">Update op uw klachtenmelding</p>
+  </div>
+
+  <div style="background:#f8fafc;padding:20px 28px;border:1px solid #e2e8f0;border-top:none">
+    <p style="font-size:14px;margin:0 0 16px;color:#0f172a">
+      Beste ${esc(k.MelderNaam || k.Melder)},<br><br>
+      Er is een wijziging doorgevoerd op uw klachtendossier <strong style="font-family:monospace;color:#1B3F6A">${esc(k.Dossiernummer)}</strong>.
+      Hieronder vindt u de aanpassing(en) en de volledige details van uw dossier.
+    </p>
+
+    <!-- WIJZIGINGEN -->
+    <div style="margin-bottom:24px">
+      <p style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#94a3b8;margin:0 0 8px">Aanpassing(en)</p>
+      <table style="width:100%;border-collapse:collapse;font-size:12px;background:#fff;border:1px solid #e2e8f0;border-radius:6px;overflow:hidden">
+        <thead><tr style="background:#f1f5f9">
+          <th style="padding:8px 12px;text-align:left;font-size:10px;font-weight:700;color:#64748b;text-transform:uppercase">Veld</th>
+          <th style="padding:8px 12px;text-align:left;font-size:10px;font-weight:700;color:#ef4444;text-transform:uppercase">Vorige waarde</th>
+          <th style="padding:8px 12px;text-align:left;font-size:10px;font-weight:700;color:#16a34a;text-transform:uppercase">Nieuwe waarde</th>
+        </tr></thead>
+        <tbody>${wijzigingenHtml}</tbody>
+      </table>
+    </div>
+
+    <!-- TICKET DETAILS -->
+    <div style="margin-bottom:20px">
+      <p style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#94a3b8;margin:0 0 8px">Dossierdetails</p>
+      <div style="background:#fff;border:1px solid #e2e8f0;border-radius:6px;overflow:hidden">
+        <table style="width:100%;border-collapse:collapse">
+          <tr style="border-bottom:1px solid #f1f5f9">
+            <td style="padding:9px 14px;font-size:12px;color:#64748b;width:160px">Dossiernummer</td>
+            <td style="padding:9px 14px;font-size:13px;font-weight:700;font-family:monospace;color:#1B3F6A">${esc(k.Dossiernummer)}</td>
+          </tr>
+          <tr style="border-bottom:1px solid #f1f5f9;background:#fafafa">
+            <td style="padding:9px 14px;font-size:12px;color:#64748b">Status</td>
+            <td style="padding:9px 14px"><span style="background:${kleur}20;color:${kleur};font-size:12px;font-weight:700;padding:3px 10px;border-radius:20px">${esc(huidigeStatus)}</span></td>
+          </tr>
+          <tr style="border-bottom:1px solid #f1f5f9">
+            <td style="padding:9px 14px;font-size:12px;color:#64748b">Behandelstatus</td>
+            <td style="padding:9px 14px;font-size:13px">${esc(k.BehandelStatus||'Nieuw')}</td>
+          </tr>
+          <tr style="border-bottom:1px solid #f1f5f9;background:#fafafa">
+            <td style="padding:9px 14px;font-size:12px;color:#64748b">Datum melding</td>
+            <td style="padding:9px 14px;font-size:13px">${datumFmt}</td>
+          </tr>
+          <tr style="border-bottom:1px solid #f1f5f9">
+            <td style="padding:9px 14px;font-size:12px;color:#64748b">Klant</td>
+            <td style="padding:9px 14px;font-size:13px;font-weight:600">${esc(k.Klantnaam)} (${esc(k.Klantnummer)})</td>
+          </tr>
+          <tr style="border-bottom:1px solid #f1f5f9;background:#fafafa">
+            <td style="padding:9px 14px;font-size:12px;color:#64748b">Factuurnummer</td>
+            <td style="padding:9px 14px;font-size:13px">${esc(k.Factuurnummer)}</td>
+          </tr>
+          <tr style="border-bottom:1px solid #f1f5f9">
+            <td style="padding:9px 14px;font-size:12px;color:#64748b">Type klacht</td>
+            <td style="padding:9px 14px;font-size:13px">${esc(k.TypeKlacht)}</td>
+          </tr>
+          <tr style="border-bottom:1px solid #f1f5f9;background:#fafafa">
+            <td style="padding:9px 14px;font-size:12px;color:#64748b">Bedrag (excl. BTW)</td>
+            <td style="padding:9px 14px;font-size:13px;font-weight:700;color:#1B3F6A">€ ${parseFloat(k.Bedrag||0).toLocaleString('nl-BE',{minimumFractionDigits:2,maximumFractionDigits:2})}</td>
+          </tr>
+          ${k.CreditnotaNr ? `<tr style="border-bottom:1px solid #f1f5f9">
+            <td style="padding:9px 14px;font-size:12px;color:#64748b">Creditnota</td>
+            <td style="padding:9px 14px;font-size:13px;font-family:monospace;font-weight:700;color:#16a34a">${esc(k.CreditnotaNr)}</td>
+          </tr>` : ''}
+          ${k.WeigeringReden ? `<tr style="background:#fff5f5">
+            <td style="padding:9px 14px;font-size:12px;color:#ef4444">Reden weigering</td>
+            <td style="padding:9px 14px;font-size:13px;color:#ef4444">${esc(k.WeigeringReden)}</td>
+          </tr>` : ''}
+          <tr style="background:#fafafa">
+            <td style="padding:9px 14px;font-size:12px;color:#64748b;vertical-align:top">Omschrijving</td>
+            <td style="padding:9px 14px;font-size:13px;line-height:1.5">${esc(k.Omschrijving)}</td>
+          </tr>
+        </table>
+      </div>
+    </div>
+
+    ${artTabelHtml}
+
+    <div style="margin-top:8px">
+      <a href="https://verpa-klachten.pages.dev/?dossier=${encodeURIComponent(k.Dossiernummer)}"
+         style="display:inline-block;background:#1B3F6A;color:#fff;text-decoration:none;padding:10px 20px;border-radius:6px;font-size:13px;font-weight:600">
+        Dossier openen →
+      </a>
+    </div>
+    <p style="font-size:11px;color:#94a3b8;margin:16px 0 0">De retourkaart is als bijlage toegevoegd aan deze e-mail.</p>
+  </div>
+  <div style="padding:14px 28px;font-size:11px;color:#94a3b8;border:1px solid #e2e8f0;border-top:none;border-radius:0 0 8px 8px;background:#fff">
+    Verpa Benelux NV &nbsp;·&nbsp; www.verpa.be &nbsp;·&nbsp; Automatisch bericht van de Klachtenapp
+  </div>
+</div>`;
+
+    // Retourkaart als HTML bijlage (base64)
+    const retourHtml   = buildRetourHtml(k);
+    const retourBase64 = btoa(unescape(encodeURIComponent(retourHtml)));
+    const bestandsnaam = `Retourkaart_${k.Dossiernummer}.html`;
+
+    const mailResp = await fetch('https://graph.microsoft.com/v1.0/me/sendMail', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${tok}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        message: {
+          subject: `[Dossier ${k.Dossiernummer}] Update – ${k.Klantnaam}`,
+          body: { contentType: 'HTML', content: htmlBody },
+          toRecipients: [{ emailAddress: { address: k.Melder } }],
+          attachments: [{
+            '@odata.type':  '#microsoft.graph.fileAttachment',
+            name:           bestandsnaam,
+            contentType:    'text/html',
+            contentBytes:   retourBase64,
+          }],
+        },
+        saveToSentItems: false,
+      }),
+    });
+
+    if (!mailResp.ok) {
+      const errBody = await mailResp.json().catch(() => ({}));
+      console.warn(`Wijzigingsmail Graph-fout (${mailResp.status}):`, errBody?.error?.message || '');
+    } else {
+      console.info(`Wijzigingsmail verstuurd naar ${k.Melder} voor ${k.Dossiernummer}`);
+    }
+  } catch(e) {
+    console.warn('Wijzigingsmail mislukt (niet kritiek):', e.message);
+  }
+}
 
 /* ══════════════════ RETOUR DOCUMENT ══════════════════ */
 function printRetour(itemId) {
