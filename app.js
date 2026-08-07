@@ -42,10 +42,30 @@ const GRAPH_SCOPES = ['User.Read', 'Sites.ReadWrite.All', 'Mail.Send'];
    ─────────────────────────────────────────────────────────────────────────── */
 const NOTIFICATIE_EMAIL = 'Ils@verpa.be';
 
+async function getMailToken() {
+  const accounts = msalInstance.getAllAccounts();
+  if (!accounts.length) return null;
+  try {
+    const resp = await msalInstance.acquireTokenSilent({ scopes: ["Mail.Send"], account: accounts[0] });
+    return resp.accessToken;
+  } catch {
+    try {
+      const resp = await msalInstance.acquireTokenPopup({ scopes: ["Mail.Send"], account: accounts[0] });
+      return resp.accessToken;
+    } catch (e) {
+      console.warn("Mail token kon niet worden opgehaald:", e.message);
+      return null;
+    }
+  }
+}
+
 async function sendNotificatiemail(klacht) {
   try {
-    const tok = await refreshToken();
-    if (!tok) return;
+    const tok = await getMailToken();
+    if (!tok) {
+      console.warn("Notificatiemail overgeslagen: geen Mail.Send token.");
+      return;
+    }
 
     const artikelRegels = (klacht.artikelregels || [])
       .filter(r => r.artnr || r.naam)
@@ -134,7 +154,7 @@ async function sendNotificatiemail(klacht) {
       </div>
     `;
 
-    await fetch('https://graph.microsoft.com/v1.0/me/sendMail', {
+    const mailResp = await fetch('https://graph.microsoft.com/v1.0/me/sendMail', {
       method: 'POST',
       headers: {
         Authorization:  `Bearer ${tok}`,
@@ -149,7 +169,13 @@ async function sendNotificatiemail(klacht) {
         saveToSentItems: false,
       }),
     });
-    console.info(`Notificatiemail verstuurd naar ${NOTIFICATIE_EMAIL} voor ${klacht.dossiernummer}`);
+    if (!mailResp.ok) {
+      const errBody = await mailResp.json().catch(() => ({}));
+      const errMsg  = errBody?.error?.message || `HTTP ${mailResp.status}`;
+      console.warn(`Notificatiemail Graph-fout (${mailResp.status}):`, errMsg);
+    } else {
+      console.info(`Notificatiemail verstuurd naar ${NOTIFICATIE_EMAIL} voor ${klacht.dossiernummer}`);
+    }
   } catch (e) {
     // Mail mislukken blokkeert nooit het indienen
     console.warn('Notificatiemail mislukt (niet kritiek):', e.message);
