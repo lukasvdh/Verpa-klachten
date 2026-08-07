@@ -2004,15 +2004,20 @@ function gesprekRenderBerichten(berichten) {
   feed.innerHTML = groepen.map(g => {
     const dagLabel = g.dag === vandaag ? 'Vandaag' : g.dag === gisteren ? 'Gisteren' : g.dag;
     const berHtml = g.items.map(b => {
-      const eigen = b.Auteur === currentUser.email;
-      const naam  = b.AuteurNaam || b.Auteur || 'Onbekend';
-      const tijd  = b.Datum ? new Date(b.Datum).toLocaleTimeString('nl-BE', {hour:'2-digit',minute:'2-digit'}) : '';
-      return `<div class="gesprek-msg ${eigen ? 'gesprek-eigen' : ''}">
-        <div class="gesprek-meta">
-          <span class="gesprek-auteur ${eigen ? 'gesprek-auteur-eigen' : ''}">${esc(naam)}</span>
-          <span class="gesprek-tijd">${tijd}</span>
+      const eigen    = b.Auteur === currentUser.email;
+      const naam     = b.AuteurNaam || b.Auteur || 'Onbekend';
+      const initials = naam.split(' ').map(w => w[0]).join('').substring(0,2).toUpperCase();
+      const d        = b.Datum ? new Date(b.Datum) : new Date();
+      const datumStr = d.toLocaleDateString('nl-BE', {day:'2-digit',month:'short'}) + ', ' + d.toLocaleTimeString('nl-BE',{hour:'2-digit',minute:'2-digit'});
+      return `<div class="gesprek-msg">
+        <div class="gesprek-avatar-cirkel gesprek-avatar-${eigen ? 'eigen' : 'ander'}">${initials}</div>
+        <div class="gesprek-inhoud">
+          <div class="gesprek-meta">
+            <span class="gesprek-auteur">${esc(naam)}</span>
+            <span class="gesprek-tijd">${datumStr}</span>
+          </div>
+          <div class="gesprek-tekst">${esc(b.Bericht)}</div>
         </div>
-        <div class="gesprek-tekst ${eigen ? 'gesprek-tekst-eigen' : ''}">${esc(b.Bericht)}</div>
       </div>`;
     }).join('');
     return `<div class="gesprek-dag-groep">
