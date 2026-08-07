@@ -805,9 +805,44 @@ function openDetail(id){
   document.getElementById('modalOverlay').classList.remove('hidden');
 
   // Gesprek laden + polling starten
+  injectGesprekStyles();
   gesprekInvoerSetup();
   gesprekLaden(k.id);
   gesprekStartPoll(k.id);
+}
+
+
+function injectGesprekStyles() {
+  if (document.getElementById('gesprek-styles')) return;
+  const s = document.createElement('style');
+  s.id = 'gesprek-styles';
+  s.textContent = `
+    .gesprek-sectie{margin-top:28px;border-top:2px solid #E2E8F0;padding-top:20px}
+    .gesprek-hd{display:flex;align-items:center;gap:8px;font-size:13px;font-weight:700;color:#0F172A;margin-bottom:14px;padding-bottom:10px;border-bottom:1px solid #E2E8F0}
+    .gesprek-feed{display:flex;flex-direction:column;max-height:380px;overflow-y:auto;margin-bottom:14px;scroll-behavior:smooth;border:1px solid #E2E8F0;border-radius:10px;background:#fff}
+    .gesprek-feed::-webkit-scrollbar{width:5px}
+    .gesprek-feed::-webkit-scrollbar-thumb{background:#CBD5E1;border-radius:4px}
+    .gesprek-empty{text-align:center;color:#94A3B8;font-size:12.5px;padding:32px 0;font-style:italic}
+    .gesprek-dag-groep{display:flex;flex-direction:column}
+    .gesprek-dag-label{display:flex;align-items:center;gap:10px;padding:8px 16px;position:sticky;top:0;background:#fff;z-index:1;border-bottom:1px solid #E2E8F0}
+    .gesprek-dag-label::before,.gesprek-dag-label::after{content:'';flex:1;height:1px;background:#E2E8F0}
+    .gesprek-dag-label span{font-size:10px;font-weight:700;color:#94A3B8;text-transform:uppercase;letter-spacing:.07em;white-space:nowrap;padding:0 6px}
+    .gesprek-msg{display:flex;align-items:flex-start;gap:12px;padding:14px 16px;border-bottom:1px solid #E2E8F0}
+    .gesprek-msg:last-child{border-bottom:none}
+    .gesprek-avatar-cirkel{width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:#fff;flex-shrink:0;margin-top:1px}
+    .gesprek-avatar-eigen{background:#1B3F6A}
+    .gesprek-avatar-ander{background:#64748B}
+    .gesprek-inhoud{flex:1;min-width:0}
+    .gesprek-meta{display:flex;align-items:baseline;gap:10px;margin-bottom:6px}
+    .gesprek-auteur{font-size:13px;font-weight:700;color:#0F172A}
+    .gesprek-tijd{font-size:11px;color:#94A3B8}
+    .gesprek-tekst{font-size:13px;color:#0F172A;line-height:1.55;word-break:break-word;background:#F1F5F9;border-radius:0 8px 8px 8px;padding:9px 12px;white-space:pre-wrap;display:block}
+    .gesprek-invoer{display:flex;gap:8px;align-items:flex-end;background:#F1F5F9;border:1px solid #E2E8F0;border-radius:10px;padding:10px 12px}
+    .gesprek-textarea{flex:1;border:none;background:transparent;outline:none;resize:none;font-size:13px;color:#0F172A;line-height:1.5;max-height:120px;overflow-y:auto}
+    .gesprek-textarea::placeholder{color:#94A3B8}
+    .gesprek-send-btn{flex-shrink:0;align-self:flex-end}
+  `;
+  document.head.appendChild(s);
 }
 
 function setupModals() {
