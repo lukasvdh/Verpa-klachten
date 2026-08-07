@@ -2665,48 +2665,41 @@ function _retourOpenVenster(itemId, autoPrint) {
 function previewRetour(itemId) { _retourOpenVenster(itemId, false); }
 function printRetour(itemId)   { _retourOpenVenster(itemId, true);  }
 
-async function downloadRetourPdf(itemId) {
+function downloadRetourPdf(itemId) {
   var k = allKlachten.find(function(x){ return x.id === itemId; });
   if (!k) return;
 
-  const btn = event && event.target ? event.target.closest('button') : null;
-  if (btn) { btn.disabled = true; btn.textContent = 'Laden…'; }
+  // Bouw volledige HTML met print-instructies
+  var html = buildRetourHtml(k)
+    .replace(
+      '<script>window.onload = function(){ window.print(); }<\/script>',
+      ''
+    )
+    .replace(
+      '</style>',
+      // Voeg print-specifieke CSS toe: verberg toolbar, stel A4 in
+      '@media print{@page{margin:12mm;size:A4}body{padding:0!important}.no-print{display:none!important}}' +
+      '</style>'
+    )
+    .replace(
+      '<body>',
+      // Toolbar met instructie + printknop (verdwijnt bij printen)
+      '<body><div class="no-print" style="position:fixed;top:0;left:0;right:0;background:#1B3F6A;color:#fff;padding:10px 20px;display:flex;align-items:center;gap:12px;z-index:9999;font-family:Helvetica Neue,Arial,sans-serif;font-size:13px">' +
+        '<span style="flex:1;font-weight:600">Sla op als PDF: kies in de printdialoog <strong>&quot;Opslaan als PDF&quot;</strong> als printer</span>' +
+        '<button onclick="window.print()" style="background:#fff;color:#1B3F6A;border:none;border-radius:6px;padding:7px 18px;font-size:13px;font-weight:700;cursor:pointer">&#128424; Opslaan als PDF</button>' +
+        '<button onclick="window.close()" style="background:transparent;color:#fff;border:1px solid rgba(255,255,255,.4);border-radius:6px;padding:7px 14px;font-size:13px;cursor:pointer">Sluiten</button>' +
+      '</div><div style="height:52px"></div>'
+    );
 
-  try {
-    // Laad html2pdf.js on-demand
-    if (!window.html2pdf) {
-      await new Promise((res, rej) => {
-        const s = document.createElement('script');
-        s.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js';
-        s.onload = res; s.onerror = rej;
-        document.head.appendChild(s);
-      });
-    }
-
-    // Bouw retourkaart HTML in een verborgen div
-    var html = buildRetourHtml(k)
-      .replace(/<!DOCTYPE html>[\s\S]*?<body[^>]*>/, '')
-      .replace(/<\/body>[\s\S]*$/, '')
-      .replace('<script>window.onload = function(){ window.print(); }<\/script>', '');
-
-    var container = document.createElement('div');
-    container.innerHTML = html;
-    container.style.cssText = 'position:fixed;top:-9999px;left:-9999px;width:210mm;background:#fff;font-family:Helvetica Neue,Arial,sans-serif';
-    document.body.appendChild(container);
-
-    await html2pdf(container, {
-      margin:      [10, 10, 10, 10],
-      filename:    'Retourkaart_' + k.Dossiernummer + '.pdf',
-      image:       { type: 'jpeg', quality: 0.95 },
-      html2canvas: { scale: 2, useCORS: true, logging: false },
-      jsPDF:       { unit: 'mm', format: 'a4', orientation: 'portrait' },
-    });
-
-    document.body.removeChild(container);
-    showToast('PDF gedownload.', 'success');
-  } catch(e) {
-    showToast('PDF genereren mislukt: ' + e.message, 'error');
-  } finally {
-    if (btn) { btn.disabled = false; btn.innerHTML = '&#11015; PDF'; }
+  var win = window.open('', '_blank');
+  if (!win) {
+    showToast('Sta pop-ups toe om de PDF te genereren.', 'error');
+    return;
   }
+  win.document.write(html);
+  win.document.close();
+  // Wacht tot geladen, dan automatisch printdialoog openen
+  win.onload = function() {
+    setTimeout(function() { win.focus(); win.print(); }, 300);
+  };
 }
