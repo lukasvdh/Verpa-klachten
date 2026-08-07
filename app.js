@@ -685,17 +685,26 @@ async function loadReview() {
 /* ══════════════════ APPROVE / REJECT ══════════════════ */
 async function approveKlacht(itemId, fromReview = false) {
   try {
-    const oudStatus = (allKlachten.find(x => x.id === itemId) || {}).Status || '–';
+    // Klacht vóór loadDashboard bewaren zodat we zeker het juiste object hebben
+    const klachtSnapshot = { ...(allKlachten.find(x => x.id === itemId) || {}) };
+    const oudStatus = klachtSnapshot.Status || '–';
+
     await spUpdateItem(itemId, {
       Status: 'Goedgekeurd',
       DatumGoedkeuring: new Date().toISOString(),
       BeoordeeldDoor: currentUser.email,
     });
+
+    // Snapshot updaten met nieuwe waarden voor de mail
+    klachtSnapshot.Status        = 'Goedgekeurd';
+    klachtSnapshot.BeoordeeldDoor = currentUser.email;
+
     showToast('Klacht goedgekeurd. Creditnota staat klaar.', 'success');
     closeModal();
     await loadDashboard();
     if (fromReview) await loadReview();
-    sendWijzigingsmail(itemId, [
+
+    await sendWijzigingsmailSnapshot(klachtSnapshot, [
       { veld: 'Status', oud: oudStatus, nieuw: 'Goedgekeurd' },
       { veld: 'Beoordeeld door', oud: '–', nieuw: currentUser.email },
     ]);
@@ -720,20 +729,28 @@ async function confirmReject() {
 
   const rejectId = currentRejectId;
   try {
-    const oudStatus = (allKlachten.find(x => x.id === rejectId) || {}).Status || '–';
+    const klachtSnapshot = { ...(allKlachten.find(x => x.id === rejectId) || {}) };
+    const oudStatus = klachtSnapshot.Status || '–';
+
     await spUpdateItem(rejectId, {
       Status: 'Geweigerd',
       WeigeringReden: reason,
       DatumGoedkeuring: new Date().toISOString(),
       BeoordeeldDoor: currentUser.email,
     });
+
+    klachtSnapshot.Status        = 'Geweigerd';
+    klachtSnapshot.WeigeringReden = reason;
+    klachtSnapshot.BeoordeeldDoor = currentUser.email;
+
     showToast('Klacht geweigerd en gearchiveerd.', 'success');
     hide('rejectOverlay');
     closeModal();
     currentRejectId = null;
     await loadDashboard();
     if (document.getElementById('viewReview').classList.contains('active')) await loadReview();
-    sendWijzigingsmail(rejectId, [
+
+    await sendWijzigingsmailSnapshot(klachtSnapshot, [
       { veld: 'Status', oud: oudStatus, nieuw: 'Geweigerd' },
       { veld: 'Reden weigering', oud: '–', nieuw: reason },
     ]);
@@ -805,7 +822,9 @@ async function saveCreditnota(itemId) {
     closeModal();
     await loadDashboard();
     if (val && val !== oudCN) {
-      sendWijzigingsmail(itemId, [
+      const klachtSnapshot = { ...(allKlachten.find(x => x.id === itemId) || {}) };
+      klachtSnapshot.CreditnotaNr = val;
+      await sendWijzigingsmailSnapshot(klachtSnapshot, [
         { veld: 'Creditnota', oud: oudCN, nieuw: val },
       ]);
     }
@@ -1521,10 +1540,12 @@ async function updateBehandelStatus(itemId, nieuweStatus, btnEl) {
 
   showToast('Behandelstatus opgeslagen: ' + nieuweStatus, 'success');
 
-  // 3. Wijzigingsmail naar melder
-  sendWijzigingsmail(itemId, [
-    { veld: 'Behandelstatus', oud: oudeBehandelStatus, nieuw: nieuweStatus },
-  ]);
+  // 3. Wijzigingsmail naar melder – snapshot van k (al bijgewerkt)
+  if (k) {
+    await sendWijzigingsmailSnapshot({ ...k }, [
+      { veld: 'Behandelstatus', oud: oudeBehandelStatus, nieuw: nieuweStatus },
+    ]);
+  }
 }
 
 async function bcPatchBehandelStatus(dossiernummer, nieuweStatus, datumAfhandeling) {
@@ -1967,17 +1988,14 @@ function buildRetourHtml(k) {
    Stuurt een mail naar de melder van het ticket bij elke statuswijziging.
    Bevat ticketdetails, de aanpassing en de retourkaart als HTML-bijlage.
    ════════════════════════════════════════════════════════════ */
-async function sendWijzigingsmail(klachtId, wijzigingen) {
-  console.log('[Wijzigingsmail] start voor id:', klachtId, 'wijzigingen:', JSON.stringify(wijzigingen));
+async function sendWijzigingsmailSnapshot(k, wijzigingen) {
+  console.log('[Wijzigingsmail] start voor dossier:', k.Dossiernummer, '| melder:', k.Melder, '| wijzigingen:', JSON.stringify(wijzigingen));
   try {
+    if (!k.Melder) { console.warn('[Wijzigingsmail] veld Melder leeg – mail niet verstuurd. Klachtdata:', JSON.stringify(k)); return; }
+
     const tok = await refreshToken();
     if (!tok) { console.warn('[Wijzigingsmail] geen token beschikbaar'); return; }
-
-    // Haal het volledige klacht-object op uit allKlachten (bevat meest recente state)
-    const k = allKlachten.find(x => x.id === klachtId);
-    if (!k) { console.warn('[Wijzigingsmail] klacht id', klachtId, 'niet gevonden in allKlachten (len:', allKlachten.length, ')'); return; }
-    if (!k.Melder) { console.warn('[Wijzigingsmail] veld Melder leeg op klacht:', JSON.stringify(k)); return; }
-    console.log('[Wijzigingsmail] verstuur naar:', k.Melder, 'dossier:', k.Dossiernummer);
+    console.log('[Wijzigingsmail] token OK, verstuur naar:', k.Melder);
 
     const datumFmt = k.DatumMelding ? new Date(k.DatumMelding).toLocaleDateString('nl-BE') : '–';
 
