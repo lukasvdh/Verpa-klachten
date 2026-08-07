@@ -777,7 +777,7 @@ function openDetail(id){
   var cnHtml=k.CreditnotaNr?'<div><div class="d-lbl">Creditnota</div><div class="d-val" style="font-family:monospace;font-weight:700;color:var(--green)">'+k.CreditnotaNr+'</div></div>':'';
   document.getElementById('modalBody').innerHTML='<div class="detail-grid"><div><div class="d-lbl">Dossiernummer</div><div class="d-val" style="font-family:monospace;font-size:15px;font-weight:700;color:var(--navy)">'+k.Dossiernummer+'</div></div><div><div class="d-lbl">Goedkeuringsstatus</div><div class="d-val">'+statusBadge(k.Status)+'</div></div><div class="d-full"><div class="d-lbl">Behandelstatus</div><div class="behandel-seg" id="behandelSeg">'+['Nieuw','In behandeling','Afgehandeld'].map(function(s){var cur=k.BehandelStatus||'Nieuw';var cls='behandel-seg-btn bs-btn-'+s.replace(/ /g,'-').toLowerCase()+(cur===s?' active':'');return'<button class="'+cls+'" onclick="updateBehandelStatus(\''+k.id+'\',\''+s+'\',this)"><span class="seg-dot"></span>'+s+'</button>';}).join('')+'</div></div><div><div class="d-lbl">Datum melding</div><div class="d-val">'+fmtDate(k.DatumMelding)+'</div></div><div><div class="d-lbl">Type klacht</div><div class="d-val">'+(typePill[k.TypeKlacht]||k.TypeKlacht)+'</div></div><div><div class="d-lbl">Klantnaam</div><div class="d-val">'+k.Klantnaam+'</div></div><div><div class="d-lbl">Klantnummer</div><div class="d-val">'+k.Klantnummer+'</div></div><div><div class="d-lbl">Factuurnummer</div><div class="d-val">'+k.Factuurnummer+'</div></div>'+(k.BeoordeeldDoor?'<div><div class="d-lbl">Beoordeeld door</div><div class="d-val">'+k.BeoordeeldDoor+'</div></div>':'')+'<div><div class="d-lbl">Datum afhandeling</div><div class="d-val" id="datumAfhandelingVal">'+(k.DatumAfhandeling?new Date(k.DatumAfhandeling).toLocaleDateString('nl-BE'):'\u2013')+'</div></div>'+cnHtml+'<div class="d-full"><div class="d-lbl">Omschrijving</div><div class="d-val desc">'+k.Omschrijving+'</div></div><div><div class="d-lbl">Ingediend door</div><div class="d-val">'+(k.MelderNaam||'\u2013')+'</div></div></div>'+artHtml+rejectHtml;
   var foot=document.getElementById('modalFooter');
-  var retourBtn='<button class="btn btn-secondary" onclick="printRetour(\''+k.id+'\')">&#128196; Retourkaart</button>';
+  var retourBtn='<button class="btn btn-secondary" onclick="printRetour(\''+k.id+'\')" style="display:inline-flex;align-items:center;gap:6px">&#128424; Afdrukken</button>'+'<button class="btn btn-secondary" onclick="downloadRetour(\''+k.id+'\')" style="display:inline-flex;align-items:center;gap:6px">&#11015; Download</button>';
   var delBtn=currentUser.isAdmin?'<button class="btn btn-danger" style="margin-left:auto" onclick="deleteKlacht(\''+k.id+'\',\''+k.Dossiernummer+'\')" title="Verwijderen">&#128465; Verwijderen</button>':'';
   if(k.Status==='Wachtend op goedkeuring'){foot.innerHTML='<button class="btn btn-success" onclick="approveKlacht(\''+k.id+'\')">&#10003; Goedkeuren</button><button class="btn btn-danger" onclick="openReject(\''+k.id+'\')">&#10007; Weigeren</button><button class="btn btn-ghost" onclick="closeModal()">Sluiten</button>'+retourBtn+delBtn;}
   else if(k.Status==='Goedgekeurd'){foot.innerHTML='<div style="display:flex;align-items:center;gap:8px;flex:1;flex-wrap:wrap"><div style="display:flex;align-items:center;border:1.5px solid var(--border);border-radius:8px;overflow:hidden;background:var(--surface)"><span style="padding:6px 10px;background:var(--gray-bg);color:var(--muted);font-size:12px;font-weight:600;border-right:1px solid var(--border);white-space:nowrap">Creditnota</span><input id="creditnota-input" type="text" placeholder="bijv. CN2026-00123 (optioneel)" value="'+(k.CreditnotaNr||'')+'" style="border:none;padding:6px 10px;font-size:13px;color:var(--text);outline:none;width:220px;font-family:monospace;font-weight:600"/></div><button class="btn btn-success btn-sm" onclick="saveCreditnota(\''+k.id+'\')">Opslaan</button></div><button class="btn btn-ghost" onclick="closeModal()">Sluiten</button>'+retourBtn+delBtn;}
@@ -2623,4 +2623,23 @@ function printRetour(itemId) {
   var win = window.open('', '_blank');
   win.document.write(html);
   win.document.close();
+}
+
+/* ══════════════════ RETOURKAART DOWNLOAD ══════════════════ */
+function downloadRetour(itemId) {
+  var k = allKlachten.find(function(x){ return x.id === itemId; });
+  if (!k) return;
+
+  // Gebruik dezelfde HTML als printRetour maar zonder auto-print script
+  var html = buildRetourHtml(k).replace('<script>window.onload = function(){ window.print(); }<\/script>', '');
+
+  var blob = new Blob([html], { type: 'text/html;charset=utf-8' });
+  var url  = URL.createObjectURL(blob);
+  var a    = document.createElement('a');
+  a.href     = url;
+  a.download = 'Retourkaart_' + k.Dossiernummer + '.html';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
 }
