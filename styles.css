@@ -276,3 +276,27 @@ button,input,select,textarea{font-family:inherit;font-size:13.5px}
 .fp-verzending{background:#EDE9FE;color:#5B21B6}
 .fp-levering{background:#FEE2E2;color:#991B1B}
 .fp-admin{background:#F1F5F9;color:#374151}
+
+/* ══════════════════ GESPREK / OPMERKINGEN FEED ══════════════════ */
+.gesprek-sectie{margin-top:24px;border-top:1px solid var(--border);padding-top:20px}
+.gesprek-hd{display:flex;align-items:center;gap:7px;font-size:13px;font-weight:700;color:var(--text);margin-bottom:12px}
+.gesprek-feed{display:flex;flex-direction:column;gap:10px;max-height:320px;overflow-y:auto;padding:4px 2px;margin-bottom:12px;scroll-behavior:smooth}
+.gesprek-feed::-webkit-scrollbar{width:4px}
+.gesprek-feed::-webkit-scrollbar-track{background:transparent}
+.gesprek-feed::-webkit-scrollbar-thumb{background:var(--border2);border-radius:4px}
+.gesprek-empty{text-align:center;color:var(--light);font-size:12.5px;padding:24px 0;font-style:italic}
+.gesprek-msg{display:flex;align-items:flex-start;gap:9px}
+.gesprek-eigen{flex-direction:row-reverse}
+.gesprek-avatar{width:30px;height:30px;border-radius:50%;background:var(--navy);color:#fff;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:2px}
+.gesprek-eigen .gesprek-avatar{background:var(--navy2)}
+.gesprek-bubble{max-width:75%;min-width:80px}
+.gesprek-meta{display:flex;align-items:baseline;gap:7px;margin-bottom:3px;flex-wrap:wrap}
+.gesprek-eigen .gesprek-meta{flex-direction:row-reverse}
+.gesprek-auteur{font-size:11px;font-weight:700;color:var(--text)}
+.gesprek-tijd{font-size:10px;color:var(--light)}
+.gesprek-tekst{background:var(--gray-bg);border:1px solid var(--border);border-radius:10px;border-top-left-radius:2px;padding:8px 12px;font-size:13px;color:var(--text);line-height:1.5;word-break:break-word}
+.gesprek-eigen .gesprek-tekst{background:var(--navy-bg);border-color:#BFD9F0;border-top-right-radius:2px;border-top-left-radius:10px}
+.gesprek-invoer{display:flex;gap:8px;align-items:flex-end;background:var(--gray-bg);border:1px solid var(--border);border-radius:10px;padding:8px 10px}
+.gesprek-textarea{flex:1;border:none;background:transparent;outline:none;resize:none;font-size:13px;color:var(--text);line-height:1.5;max-height:120px;overflow-y:auto}
+.gesprek-textarea::placeholder{color:var(--light)}
+.gesprek-send-btn{flex-shrink:0;align-self:flex-end}

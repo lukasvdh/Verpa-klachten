@@ -41,6 +41,7 @@ const GRAPH_SCOPES = ['User.Read', 'Sites.ReadWrite.All', 'Mail.Send'];
    Ontvangt een melding bij elk nieuw ingediend ticket.
    ─────────────────────────────────────────────────────────────────────────── */
 const NOTIFICATIE_EMAIL = 'Ils@verpa.be';
+const SP_GESPREK_LIST   = 'KlachtenGesprekken'; // SharePoint lijst voor gesprekberichten
 
 async function sendNotificatiemail(klacht) {
   try {
@@ -781,7 +782,32 @@ function openDetail(id){
   if(k.Status==='Wachtend op goedkeuring'){foot.innerHTML='<button class="btn btn-success" onclick="approveKlacht(\''+k.id+'\')">&#10003; Goedkeuren</button><button class="btn btn-danger" onclick="openReject(\''+k.id+'\')">&#10007; Weigeren</button><button class="btn btn-ghost" onclick="closeModal()">Sluiten</button>'+retourBtn+delBtn;}
   else if(k.Status==='Goedgekeurd'){foot.innerHTML='<div style="display:flex;align-items:center;gap:8px;flex:1;flex-wrap:wrap"><div style="display:flex;align-items:center;border:1.5px solid var(--border);border-radius:8px;overflow:hidden;background:var(--surface)"><span style="padding:6px 10px;background:var(--gray-bg);color:var(--muted);font-size:12px;font-weight:600;border-right:1px solid var(--border);white-space:nowrap">Creditnota</span><input id="creditnota-input" type="text" placeholder="bijv. CN2026-00123 (optioneel)" value="'+(k.CreditnotaNr||'')+'" style="border:none;padding:6px 10px;font-size:13px;color:var(--text);outline:none;width:220px;font-family:monospace;font-weight:600"/></div><button class="btn btn-success btn-sm" onclick="saveCreditnota(\''+k.id+'\')">Opslaan</button></div><button class="btn btn-ghost" onclick="closeModal()">Sluiten</button>'+retourBtn+delBtn;}
   else{foot.innerHTML='<button class="btn" onclick="closeModal()">Sluiten</button>'+retourBtn+delBtn;}
+  // Gesprek sectie toevoegen onderaan modalBody
+  document.getElementById('modalBody').insertAdjacentHTML('beforeend', `
+    <div class="gesprek-sectie">
+      <div class="gesprek-hd">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
+        <span>Gesprek</span>
+      </div>
+      <div class="gesprek-feed" id="gesprekFeed">
+        <div class="gesprek-empty">Berichten laden…</div>
+      </div>
+      <div class="gesprek-invoer">
+        <textarea id="gesprekInput" class="gesprek-textarea" placeholder="Schrijf een bericht… (Ctrl/⌘ + Enter om te versturen)" rows="1"></textarea>
+        <button id="gesprekVerstuurBtn" class="btn btn-primary btn-sm gesprek-send-btn">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 2L11 13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+          Verstuur
+        </button>
+      </div>
+    </div>
+  `);
+
   document.getElementById('modalOverlay').classList.remove('hidden');
+
+  // Gesprek laden + polling starten
+  gesprekInvoerSetup();
+  gesprekLaden(k.id);
+  gesprekStartPoll(k.id);
 }
 
 function setupModals() {
@@ -799,7 +825,11 @@ function setupModals() {
   });
 }
 
-function closeModal() { hide('modalOverlay'); }
+function closeModal() {
+  hide('modalOverlay');
+  gesprekStopPoll();
+  _gesprekKlachtId = null;
+}
 
 async function deleteKlacht(itemId, dossiernummer) {
   if (!confirm('Dossier ' + dossiernummer + ' definitief verwijderen? Dit kan niet ongedaan worden gemaakt.')) return;
@@ -1857,6 +1887,164 @@ function showToast(msg, type = '') {
 /* ══════════════════ START ══════════════════ */
 init();
 
+
+
+/* ══════════════════ GESPREK / OPMERKINGEN FEED ══════════════════
+   Berichten worden opgeslagen in de SharePoint lijst KlachtenGesprekken.
+   Kolommen: KlachtId (text), Bericht (meerdere regels), Auteur (text),
+             AuteurNaam (text), Datum (datum+tijd)
+   ════════════════════════════════════════════════════════════════ */
+
+let _gesprekListId   = null;
+let _gesprekPollTimer = null;
+let _gesprekKlachtId  = null;  // huidig open dossier
+
+async function getGesprekListId() {
+  if (_gesprekListId) return _gesprekListId;
+  const siteId = await getSiteId();
+  const tok    = await refreshToken();
+  const data   = await graphGet(`/sites/${siteId}/lists?$filter=displayName eq '${SP_GESPREK_LIST}'`, tok);
+  if (!data.value.length) throw new Error(`SharePoint lijst "${SP_GESPREK_LIST}" niet gevonden. Maak ze aan via de README.`);
+  _gesprekListId = data.value[0].id;
+  return _gesprekListId;
+}
+
+async function gesprekGetBerichten(klachtId) {
+  const siteId  = await getSiteId();
+  const listId  = await getGesprekListId();
+  const tok     = await refreshToken();
+  const filter  = encodeURIComponent(`fields/KlachtId eq '${klachtId}'`);
+  const data    = await graphGet(
+    `/sites/${siteId}/lists/${listId}/items?$filter=${filter}&$expand=fields&$orderby=fields/Datum asc&$top=200`,
+    tok
+  );
+  return data.value.map(i => ({ id: i.id, ...i.fields }));
+}
+
+async function gesprekPostBericht(klachtId, bericht) {
+  const siteId = await getSiteId();
+  const listId = await getGesprekListId();
+  const tok    = await refreshToken();
+  const r = await fetch(`https://graph.microsoft.com/v1.0/sites/${siteId}/lists/${listId}/items`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${tok}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ fields: {
+      KlachtId:   klachtId,
+      Bericht:    bericht,
+      Auteur:     currentUser.email,
+      AuteurNaam: currentUser.name,
+      Datum:      new Date().toISOString(),
+    }}),
+  });
+  if (!r.ok) { const e = await r.json().catch(()=>({})); throw new Error(e?.error?.message || `HTTP ${r.status}`); }
+  return r.json();
+}
+
+function gesprekRenderBerichten(berichten) {
+  const feed = document.getElementById('gesprekFeed');
+  if (!feed) return;
+
+  if (!berichten.length) {
+    feed.innerHTML = '<div class="gesprek-empty">Nog geen berichten. Start het gesprek hieronder.</div>';
+    return;
+  }
+
+  const isEigenBericht = (b) => b.Auteur === currentUser.email;
+
+  feed.innerHTML = berichten.map(b => {
+    const eigen = isEigenBericht(b);
+    const initials = (b.AuteurNaam || b.Auteur || '?').split(' ').map(w => w[0]).join('').substring(0,2).toUpperCase();
+    const datum = b.Datum ? new Date(b.Datum).toLocaleString('nl-BE', {day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'}) : '';
+    const naam  = b.AuteurNaam || b.Auteur || 'Onbekend';
+    return `<div class="gesprek-msg ${eigen ? 'gesprek-eigen' : 'gesprek-ander'}">
+      <div class="gesprek-avatar" title="${esc(naam)}">${initials}</div>
+      <div class="gesprek-bubble">
+        <div class="gesprek-meta"><span class="gesprek-auteur">${esc(naam)}</span><span class="gesprek-tijd">${datum}</span></div>
+        <div class="gesprek-tekst">${esc(b.Bericht).replace(/\n/g,'<br>')}</div>
+      </div>
+    </div>`;
+  }).join('');
+
+  // Scroll naar onderaan
+  feed.scrollTop = feed.scrollHeight;
+}
+
+async function gesprekLaden(klachtId) {
+  _gesprekKlachtId = klachtId;
+  const feed = document.getElementById('gesprekFeed');
+  if (!feed) return;
+  feed.innerHTML = '<div class="gesprek-empty">Berichten laden…</div>';
+  try {
+    const berichten = await gesprekGetBerichten(klachtId);
+    gesprekRenderBerichten(berichten);
+  } catch(e) {
+    feed.innerHTML = `<div class="gesprek-empty" style="color:var(--red)">Fout bij laden: ${esc(e.message)}</div>`;
+  }
+}
+
+async function gesprekVerstuur() {
+  const input = document.getElementById('gesprekInput');
+  const btn   = document.getElementById('gesprekVerstuurBtn');
+  if (!input || !btn) return;
+
+  const tekst = input.value.trim();
+  if (!tekst) return;
+  if (!_gesprekKlachtId) return;
+
+  btn.disabled = true;
+  btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>';
+
+  try {
+    await gesprekPostBericht(_gesprekKlachtId, tekst);
+    input.value = '';
+    input.style.height = 'auto';
+    // Herladen
+    const berichten = await gesprekGetBerichten(_gesprekKlachtId);
+    gesprekRenderBerichten(berichten);
+  } catch(e) {
+    showToast('Bericht versturen mislukt: ' + e.message, 'error');
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 2L11 13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg> Verstuur';
+  }
+}
+
+function gesprekStartPoll(klachtId) {
+  gesprekStopPoll();
+  _gesprekPollTimer = setInterval(async () => {
+    if (!_gesprekKlachtId) return;
+    try {
+      const berichten = await gesprekGetBerichten(_gesprekKlachtId);
+      gesprekRenderBerichten(berichten);
+    } catch(e) { /* stil falen */ }
+  }, 30000);
+}
+
+function gesprekStopPoll() {
+  if (_gesprekPollTimer) { clearInterval(_gesprekPollTimer); _gesprekPollTimer = null; }
+}
+
+function gesprekInvoerSetup() {
+  const input = document.getElementById('gesprekInput');
+  const btn   = document.getElementById('gesprekVerstuurBtn');
+  if (!input || !btn) return;
+
+  // Auto-resize textarea
+  input.addEventListener('input', () => {
+    input.style.height = 'auto';
+    input.style.height = Math.min(input.scrollHeight, 120) + 'px';
+  });
+
+  // Ctrl/Cmd+Enter om te versturen
+  input.addEventListener('keydown', (e) => {
+    if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+      e.preventDefault();
+      gesprekVerstuur();
+    }
+  });
+
+  btn.addEventListener('click', gesprekVerstuur);
+}
 
 /* ══════════════════ RETOURKAART HTML BUILDER ══════════════════
    Gedeelde helper: genereert dezelfde HTML als printRetour()
