@@ -782,19 +782,21 @@ function openDetail(id){
   if(k.Status==='Wachtend op goedkeuring'){foot.innerHTML='<button class="btn btn-success" onclick="approveKlacht(\''+k.id+'\')">&#10003; Goedkeuren</button><button class="btn btn-danger" onclick="openReject(\''+k.id+'\')">&#10007; Weigeren</button><button class="btn btn-ghost" onclick="closeModal()">Sluiten</button>'+retourBtn+delBtn;}
   else if(k.Status==='Goedgekeurd'){foot.innerHTML='<div style="display:flex;align-items:center;gap:8px;flex:1;flex-wrap:wrap"><div style="display:flex;align-items:center;border:1.5px solid var(--border);border-radius:8px;overflow:hidden;background:var(--surface)"><span style="padding:6px 10px;background:var(--gray-bg);color:var(--muted);font-size:12px;font-weight:600;border-right:1px solid var(--border);white-space:nowrap">Creditnota</span><input id="creditnota-input" type="text" placeholder="bijv. CN2026-00123 (optioneel)" value="'+(k.CreditnotaNr||'')+'" style="border:none;padding:6px 10px;font-size:13px;color:var(--text);outline:none;width:220px;font-family:monospace;font-weight:600"/></div><button class="btn btn-success btn-sm" onclick="saveCreditnota(\''+k.id+'\')">Opslaan</button></div><button class="btn btn-ghost" onclick="closeModal()">Sluiten</button>'+retourBtn+delBtn;}
   else{foot.innerHTML='<button class="btn" onclick="closeModal()">Sluiten</button>'+retourBtn+delBtn;}
-  // Gesprek sectie toevoegen onderaan modalBody
+  // Gesprek sectie toevoegen onderaan modalBody – volledig inline gestyled
   document.getElementById('modalBody').insertAdjacentHTML('beforeend', `
-    <div class="gesprek-sectie">
-      <div class="gesprek-hd">
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
-        <span>Gesprek</span>
+    <div style="margin-top:28px;border-top:2px solid #E2E8F0;padding-top:20px">
+      <div style="display:flex;align-items:center;gap:8px;font-size:13px;font-weight:700;color:#0F172A;margin-bottom:14px;padding-bottom:10px;border-bottom:1px solid #E2E8F0">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color:#1B3F6A;flex-shrink:0"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
+        Gesprek
       </div>
-      <div class="gesprek-feed" id="gesprekFeed">
-        <div class="gesprek-empty">Berichten laden…</div>
+      <div id="gesprekFeed" style="display:flex;flex-direction:column;max-height:380px;overflow-y:auto;margin-bottom:14px;scroll-behavior:smooth;border:1px solid #E2E8F0;border-radius:10px;background:#fff">
+        <div style="text-align:center;color:#94A3B8;font-size:12.5px;padding:32px 0;font-style:italic">Berichten laden…</div>
       </div>
-      <div class="gesprek-invoer">
-        <textarea id="gesprekInput" class="gesprek-textarea" placeholder="Schrijf een bericht… (Ctrl/⌘ + Enter om te versturen)" rows="1"></textarea>
-        <button id="gesprekVerstuurBtn" class="btn btn-primary btn-sm gesprek-send-btn">
+      <div style="display:flex;gap:8px;align-items:flex-end;background:#F1F5F9;border:1px solid #E2E8F0;border-radius:10px;padding:10px 12px">
+        <textarea id="gesprekInput" rows="1" placeholder="Schrijf een bericht… (Ctrl/⌘ + Enter om te versturen)"
+          style="flex:1;border:none;background:transparent;outline:none;resize:none;font-size:13px;color:#0F172A;line-height:1.5;max-height:120px;overflow-y:auto;font-family:inherit"></textarea>
+        <button id="gesprekVerstuurBtn"
+          style="flex-shrink:0;display:inline-flex;align-items:center;gap:6px;padding:7px 14px;border-radius:8px;border:none;cursor:pointer;font-size:13px;font-weight:600;background:#1B3F6A;color:#fff;white-space:nowrap;font-family:inherit">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 2L11 13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
           Verstuur
         </button>
@@ -2016,7 +2018,7 @@ function gesprekRenderBerichten(berichten) {
   if (!feed) return;
 
   if (!berichten.length) {
-    feed.innerHTML = '<div class="gesprek-empty">Nog geen berichten. Start het gesprek hieronder.</div>';
+    feed.innerHTML = '<div style="text-align:center;color:#94A3B8;font-size:12.5px;padding:32px 0;font-style:italic">Nog geen berichten. Start het gesprek hieronder.</div>';
     return;
   }
 
@@ -2033,32 +2035,39 @@ function gesprekRenderBerichten(berichten) {
     groepen[groepen.length - 1].items.push(b);
   });
 
-  const vandaag   = new Date().toLocaleDateString('nl-BE', {day:'2-digit',month:'2-digit',year:'numeric'});
-  const gisteren  = new Date(Date.now()-86400000).toLocaleDateString('nl-BE', {day:'2-digit',month:'2-digit',year:'numeric'});
+  const vandaag  = new Date().toLocaleDateString('nl-BE', {day:'2-digit',month:'2-digit',year:'numeric'});
+  const gisteren = new Date(Date.now()-86400000).toLocaleDateString('nl-BE', {day:'2-digit',month:'2-digit',year:'numeric'});
 
   feed.innerHTML = groepen.map(g => {
     const dagLabel = g.dag === vandaag ? 'Vandaag' : g.dag === gisteren ? 'Gisteren' : g.dag;
-    const berHtml = g.items.map(b => {
+    const berHtml = g.items.map((b, idx, arr) => {
       const eigen    = b.Auteur === currentUser.email;
       const naam     = b.AuteurNaam || b.Auteur || 'Onbekend';
       const initials = naam.split(' ').map(w => w[0]).join('').substring(0,2).toUpperCase();
       const d        = b.Datum ? new Date(b.Datum) : new Date();
       const datumStr = d.toLocaleDateString('nl-BE', {day:'2-digit',month:'short'}) + ', ' + d.toLocaleTimeString('nl-BE',{hour:'2-digit',minute:'2-digit'});
-      return `<div class="gesprek-msg">
-        <div class="gesprek-avatar-cirkel gesprek-avatar-${eigen ? 'eigen' : 'ander'}">${initials}</div>
-        <div class="gesprek-inhoud">
-          <div class="gesprek-meta">
-            <span class="gesprek-auteur">${esc(naam)}</span>
-            <span class="gesprek-tijd">${datumStr}</span>
+      const isLast   = idx === arr.length - 1;
+      const avatarBg = eigen ? '#1B3F6A' : '#64748B';
+      const border   = isLast ? '' : 'border-bottom:1px solid #E2E8F0;';
+      return `<div style="display:flex;align-items:flex-start;gap:12px;padding:14px 16px;${border}">
+        <div style="width:36px;height:36px;border-radius:50%;background:${avatarBg};color:#fff;font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px">${initials}</div>
+        <div style="flex:1;min-width:0">
+          <div style="display:flex;align-items:baseline;gap:10px;margin-bottom:6px">
+            <span style="font-size:13px;font-weight:700;color:#0F172A">${esc(naam)}</span>
+            <span style="font-size:11px;color:#94A3B8">${datumStr}</span>
           </div>
-          <div class="gesprek-tekst">${esc(b.Bericht)}</div>
+          <div style="font-size:13px;color:#0F172A;line-height:1.55;word-break:break-word;background:#F1F5F9;border-radius:0 8px 8px 8px;padding:9px 12px;white-space:pre-wrap;display:inline-block;max-width:100%">${esc(b.Bericht)}</div>
         </div>
       </div>`;
     }).join('');
-    return `<div class="gesprek-dag-groep">
-      <div class="gesprek-dag-label"><span>${dagLabel}</span></div>
-      ${berHtml}
+
+    const dagDivider = `<div style="display:flex;align-items:center;gap:10px;padding:8px 16px;background:#fff;border-bottom:1px solid #E2E8F0;position:sticky;top:0;z-index:1">
+      <div style="flex:1;height:1px;background:#E2E8F0"></div>
+      <span style="font-size:10px;font-weight:700;color:#94A3B8;text-transform:uppercase;letter-spacing:.07em;white-space:nowrap">${dagLabel}</span>
+      <div style="flex:1;height:1px;background:#E2E8F0"></div>
     </div>`;
+
+    return `<div>${dagDivider}${berHtml}</div>`;
   }).join('');
 
   feed.scrollTop = feed.scrollHeight;
