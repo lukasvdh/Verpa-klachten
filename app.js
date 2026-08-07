@@ -42,28 +42,11 @@ const GRAPH_SCOPES = ['User.Read', 'Sites.ReadWrite.All', 'Mail.Send'];
    ─────────────────────────────────────────────────────────────────────────── */
 const NOTIFICATIE_EMAIL = 'Ils@verpa.be';
 
-async function getMailToken() {
-  const accounts = msalInstance.getAllAccounts();
-  if (!accounts.length) return null;
-  try {
-    const resp = await msalInstance.acquireTokenSilent({ scopes: ["Mail.Send"], account: accounts[0] });
-    return resp.accessToken;
-  } catch {
-    try {
-      const resp = await msalInstance.acquireTokenPopup({ scopes: ["Mail.Send"], account: accounts[0] });
-      return resp.accessToken;
-    } catch (e) {
-      console.warn("Mail token kon niet worden opgehaald:", e.message);
-      return null;
-    }
-  }
-}
-
 async function sendNotificatiemail(klacht) {
   try {
-    const tok = await getMailToken();
+    const tok = await refreshToken();
     if (!tok) {
-      console.warn("Notificatiemail overgeslagen: geen Mail.Send token.");
+      console.warn('[Notificatiemail] geen token beschikbaar');
       return;
     }
 
@@ -1985,14 +1968,16 @@ function buildRetourHtml(k) {
    Bevat ticketdetails, de aanpassing en de retourkaart als HTML-bijlage.
    ════════════════════════════════════════════════════════════ */
 async function sendWijzigingsmail(klachtId, wijzigingen) {
+  console.log('[Wijzigingsmail] start voor id:', klachtId, 'wijzigingen:', JSON.stringify(wijzigingen));
   try {
-    const tok = await getMailToken();
-    if (!tok) { console.warn('Wijzigingsmail overgeslagen: geen Mail.Send token.'); return; }
+    const tok = await refreshToken();
+    if (!tok) { console.warn('[Wijzigingsmail] geen token beschikbaar'); return; }
 
     // Haal het volledige klacht-object op uit allKlachten (bevat meest recente state)
     const k = allKlachten.find(x => x.id === klachtId);
-    if (!k) { console.warn('Wijzigingsmail: klacht niet gevonden in allKlachten'); return; }
-    if (!k.Melder) { console.warn('Wijzigingsmail: geen melder-email op klacht'); return; }
+    if (!k) { console.warn('[Wijzigingsmail] klacht id', klachtId, 'niet gevonden in allKlachten (len:', allKlachten.length, ')'); return; }
+    if (!k.Melder) { console.warn('[Wijzigingsmail] veld Melder leeg op klacht:', JSON.stringify(k)); return; }
+    console.log('[Wijzigingsmail] verstuur naar:', k.Melder, 'dossier:', k.Dossiernummer);
 
     const datumFmt = k.DatumMelding ? new Date(k.DatumMelding).toLocaleDateString('nl-BE') : '–';
 
@@ -2177,12 +2162,12 @@ async function sendWijzigingsmail(klachtId, wijzigingen) {
 
     if (!mailResp.ok) {
       const errBody = await mailResp.json().catch(() => ({}));
-      console.warn(`Wijzigingsmail Graph-fout (${mailResp.status}):`, errBody?.error?.message || '');
+      console.error(`[Wijzigingsmail] Graph-fout (${mailResp.status}):`, errBody?.error?.message || errBody);
     } else {
-      console.info(`Wijzigingsmail verstuurd naar ${k.Melder} voor ${k.Dossiernummer}`);
+      console.info(`[Wijzigingsmail] ✅ verstuurd naar ${k.Melder} voor ${k.Dossiernummer}`);
     }
   } catch(e) {
-    console.warn('Wijzigingsmail mislukt (niet kritiek):', e.message);
+    console.error('[Wijzigingsmail] uitzondering:', e);
   }
 }
 
