@@ -2007,14 +2007,12 @@ function gesprekRenderBerichten(berichten) {
       const eigen = b.Auteur === currentUser.email;
       const naam  = b.AuteurNaam || b.Auteur || 'Onbekend';
       const tijd  = b.Datum ? new Date(b.Datum).toLocaleTimeString('nl-BE', {hour:'2-digit',minute:'2-digit'}) : '';
-      return `<div class="gesprek-msg ${eigen ? 'gesprek-eigen' : 'gesprek-ander'}">
-        <div class="gesprek-bubble">
-          <div class="gesprek-meta">
-            <span class="gesprek-auteur ${eigen ? 'gesprek-auteur-eigen' : ''}">${esc(naam)}</span>
-            <span class="gesprek-tijd">${tijd}</span>
-          </div>
-          <div class="gesprek-tekst ${eigen ? 'gesprek-tekst-eigen' : ''}">${esc(b.Bericht).replace(/\n/g,'<br>')}</div>
+      return `<div class="gesprek-msg ${eigen ? 'gesprek-eigen' : ''}">
+        <div class="gesprek-meta">
+          <span class="gesprek-auteur ${eigen ? 'gesprek-auteur-eigen' : ''}">${esc(naam)}</span>
+          <span class="gesprek-tijd">${tijd}</span>
         </div>
+        <div class="gesprek-tekst ${eigen ? 'gesprek-tekst-eigen' : ''}">${esc(b.Bericht)}</div>
       </div>`;
     }).join('');
     return `<div class="gesprek-dag-groep">
