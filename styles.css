@@ -285,17 +285,21 @@ button,input,select,textarea{font-family:inherit;font-size:13.5px}
 .gesprek-feed::-webkit-scrollbar-track{background:transparent}
 .gesprek-feed::-webkit-scrollbar-thumb{background:var(--border2);border-radius:4px}
 .gesprek-empty{text-align:center;color:var(--light);font-size:12.5px;padding:24px 0;font-style:italic}
-.gesprek-msg{display:flex;align-items:flex-start;gap:9px}
-.gesprek-eigen{flex-direction:row-reverse}
-.gesprek-avatar{width:30px;height:30px;border-radius:50%;background:var(--navy);color:#fff;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:2px}
-.gesprek-eigen .gesprek-avatar{background:var(--navy2)}
-.gesprek-bubble{max-width:75%;min-width:80px}
-.gesprek-meta{display:flex;align-items:baseline;gap:7px;margin-bottom:3px;flex-wrap:wrap}
+.gesprek-dag-groep{display:flex;flex-direction:column;gap:8px}
+.gesprek-dag-label{display:flex;align-items:center;gap:10px;margin:6px 0 2px;text-align:center}
+.gesprek-dag-label::before,.gesprek-dag-label::after{content:'';flex:1;height:1px;background:var(--border)}
+.gesprek-dag-label span{font-size:10px;font-weight:700;color:var(--light);text-transform:uppercase;letter-spacing:.06em;white-space:nowrap;padding:0 4px}
+.gesprek-msg{display:flex}
+.gesprek-eigen{justify-content:flex-end}
+.gesprek-ander{justify-content:flex-start}
+.gesprek-bubble{max-width:78%;min-width:80px}
+.gesprek-meta{display:flex;align-items:baseline;gap:8px;margin-bottom:3px}
 .gesprek-eigen .gesprek-meta{flex-direction:row-reverse}
-.gesprek-auteur{font-size:11px;font-weight:700;color:var(--text)}
+.gesprek-auteur{font-size:11px;font-weight:700;color:var(--navy)}
+.gesprek-auteur-eigen{color:var(--navy2)}
 .gesprek-tijd{font-size:10px;color:var(--light)}
-.gesprek-tekst{background:var(--gray-bg);border:1px solid var(--border);border-radius:10px;border-top-left-radius:2px;padding:8px 12px;font-size:13px;color:var(--text);line-height:1.5;word-break:break-word}
-.gesprek-eigen .gesprek-tekst{background:var(--navy-bg);border-color:#BFD9F0;border-top-right-radius:2px;border-top-left-radius:10px}
+.gesprek-tekst{background:var(--gray-bg);border:1px solid var(--border);border-radius:12px;border-top-left-radius:3px;padding:9px 13px;font-size:13px;color:var(--text);line-height:1.55;word-break:break-word}
+.gesprek-tekst-eigen{background:var(--navy-bg);border-color:#BFD9F0;border-top-right-radius:3px;border-top-left-radius:12px}
 .gesprek-invoer{display:flex;gap:8px;align-items:flex-end;background:var(--gray-bg);border:1px solid var(--border);border-radius:10px;padding:8px 10px}
 .gesprek-textarea{flex:1;border:none;background:transparent;outline:none;resize:none;font-size:13px;color:var(--text);line-height:1.5;max-height:120px;overflow-y:auto}
 .gesprek-textarea::placeholder{color:var(--light)}

@@ -1903,9 +1903,45 @@ async function getGesprekListId() {
   if (_gesprekListId) return _gesprekListId;
   const siteId = await getSiteId();
   const tok    = await refreshToken();
-  const data   = await graphGet(`/sites/${siteId}/lists?$filter=displayName eq '${SP_GESPREK_LIST}'`, tok);
-  if (!data.value.length) throw new Error(`SharePoint lijst "${SP_GESPREK_LIST}" niet gevonden. Maak ze aan via de README.`);
-  _gesprekListId = data.value[0].id;
+
+  // Controleer of de lijst al bestaat
+  const data = await graphGet(`/sites/${siteId}/lists?$filter=displayName eq '${SP_GESPREK_LIST}'`, tok);
+  if (data.value.length) {
+    _gesprekListId = data.value[0].id;
+    return _gesprekListId;
+  }
+
+  // Stap 1: lege lijst aanmaken
+  console.info('[Gesprek] Lijst niet gevonden, wordt aangemaakt...');
+  const createResp = await fetch(`https://graph.microsoft.com/v1.0/sites/${siteId}/lists`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${tok}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ displayName: SP_GESPREK_LIST, list: { template: 'genericList' } }),
+  });
+  if (!createResp.ok) {
+    const err = await createResp.json().catch(() => ({}));
+    throw new Error('Kon lijst niet aanmaken: ' + (err && err.error ? err.error.message : createResp.status));
+  }
+  const created = await createResp.json();
+  _gesprekListId = created.id;
+
+  // Stap 2: kolommen apart toevoegen (betrouwbaarder dan inline bij create)
+  const kolommen = [
+    { name: 'KlachtId',   text: {}, indexed: true },
+    { name: 'Bericht',    text: { allowMultipleLines: true, linesForEditing: 6 } },
+    { name: 'Auteur',     text: {} },
+    { name: 'AuteurNaam', text: {} },
+    { name: 'Datum',      dateTime: { displayAs: 'dateTime', format: 'dateOnly' } },
+  ];
+  for (const kol of kolommen) {
+    await fetch(`https://graph.microsoft.com/v1.0/sites/${siteId}/lists/${_gesprekListId}/columns`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${tok}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify(kol),
+    }).catch(e => console.warn('[Gesprek] Kolom aanmaken mislukt:', kol.name, e.message));
+  }
+
+  console.info('[Gesprek] Lijst en kolommen aangemaakt, id: ' + _gesprekListId);
   return _gesprekListId;
 }
 
@@ -1949,23 +1985,44 @@ function gesprekRenderBerichten(berichten) {
     return;
   }
 
-  const isEigenBericht = (b) => b.Auteur === currentUser.email;
+  // Groepeer per dag
+  const groepen = [];
+  let huidigeDag = null;
+  berichten.forEach(b => {
+    const d = b.Datum ? new Date(b.Datum) : new Date();
+    const dagKey = d.toLocaleDateString('nl-BE', {day:'2-digit',month:'2-digit',year:'numeric'});
+    if (dagKey !== huidigeDag) {
+      huidigeDag = dagKey;
+      groepen.push({ dag: dagKey, items: [] });
+    }
+    groepen[groepen.length - 1].items.push(b);
+  });
 
-  feed.innerHTML = berichten.map(b => {
-    const eigen = isEigenBericht(b);
-    const initials = (b.AuteurNaam || b.Auteur || '?').split(' ').map(w => w[0]).join('').substring(0,2).toUpperCase();
-    const datum = b.Datum ? new Date(b.Datum).toLocaleString('nl-BE', {day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'}) : '';
-    const naam  = b.AuteurNaam || b.Auteur || 'Onbekend';
-    return `<div class="gesprek-msg ${eigen ? 'gesprek-eigen' : 'gesprek-ander'}">
-      <div class="gesprek-avatar" title="${esc(naam)}">${initials}</div>
-      <div class="gesprek-bubble">
-        <div class="gesprek-meta"><span class="gesprek-auteur">${esc(naam)}</span><span class="gesprek-tijd">${datum}</span></div>
-        <div class="gesprek-tekst">${esc(b.Bericht).replace(/\n/g,'<br>')}</div>
-      </div>
+  const vandaag   = new Date().toLocaleDateString('nl-BE', {day:'2-digit',month:'2-digit',year:'numeric'});
+  const gisteren  = new Date(Date.now()-86400000).toLocaleDateString('nl-BE', {day:'2-digit',month:'2-digit',year:'numeric'});
+
+  feed.innerHTML = groepen.map(g => {
+    const dagLabel = g.dag === vandaag ? 'Vandaag' : g.dag === gisteren ? 'Gisteren' : g.dag;
+    const berHtml = g.items.map(b => {
+      const eigen = b.Auteur === currentUser.email;
+      const naam  = b.AuteurNaam || b.Auteur || 'Onbekend';
+      const tijd  = b.Datum ? new Date(b.Datum).toLocaleTimeString('nl-BE', {hour:'2-digit',minute:'2-digit'}) : '';
+      return `<div class="gesprek-msg ${eigen ? 'gesprek-eigen' : 'gesprek-ander'}">
+        <div class="gesprek-bubble">
+          <div class="gesprek-meta">
+            <span class="gesprek-auteur ${eigen ? 'gesprek-auteur-eigen' : ''}">${esc(naam)}</span>
+            <span class="gesprek-tijd">${tijd}</span>
+          </div>
+          <div class="gesprek-tekst ${eigen ? 'gesprek-tekst-eigen' : ''}">${esc(b.Bericht).replace(/\n/g,'<br>')}</div>
+        </div>
+      </div>`;
+    }).join('');
+    return `<div class="gesprek-dag-groep">
+      <div class="gesprek-dag-label"><span>${dagLabel}</span></div>
+      ${berHtml}
     </div>`;
   }).join('');
 
-  // Scroll naar onderaan
   feed.scrollTop = feed.scrollHeight;
 }
 
