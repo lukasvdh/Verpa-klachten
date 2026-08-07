@@ -35,7 +35,126 @@ const msalConfig = {
   cache: { cacheLocation: 'sessionStorage', storeAuthStateInCookie: false },
 };
 
-const GRAPH_SCOPES = ['User.Read', 'Sites.ReadWrite.All'];
+const GRAPH_SCOPES = ['User.Read', 'Sites.ReadWrite.All', 'Mail.Send'];
+
+/* ── NOTIFICATIE EMAIL ───────────────────────────────────────────────────────
+   Ontvangt een melding bij elk nieuw ingediend ticket.
+   ─────────────────────────────────────────────────────────────────────────── */
+const NOTIFICATIE_EMAIL = 'Ils@verpa.be';
+
+async function sendNotificatiemail(klacht) {
+  try {
+    const tok = await refreshToken();
+    if (!tok) return;
+
+    const artikelRegels = (klacht.artikelregels || [])
+      .filter(r => r.artnr || r.naam)
+      .map(r => `
+        <tr>
+          <td style="padding:6px 10px;border-bottom:1px solid #e2e8f0;font-family:monospace;font-size:12px">${esc(r.artnr || '–')}</td>
+          <td style="padding:6px 10px;border-bottom:1px solid #e2e8f0">${esc(r.naam || '–')}</td>
+          <td style="padding:6px 10px;border-bottom:1px solid #e2e8f0;text-align:center">${esc(r.uom || 'ST')}</td>
+          <td style="padding:6px 10px;border-bottom:1px solid #e2e8f0;text-align:right">${r.aantal}</td>
+          <td style="padding:6px 10px;border-bottom:1px solid #e2e8f0;text-align:right">€ ${parseFloat(r.prijs || 0).toFixed(2).replace('.', ',')}</td>
+        </tr>
+      `).join('');
+
+    const bedragFmt = parseFloat(klacht.bedrag || 0).toLocaleString('nl-BE', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    const datumFmt  = new Date().toLocaleDateString('nl-BE', { day: '2-digit', month: '2-digit', year: 'numeric' });
+
+    const htmlBody = `
+      <div style="font-family:'Helvetica Neue',Arial,sans-serif;max-width:600px;margin:0 auto;color:#1a1a2e">
+        <div style="background:#1B3F6A;padding:20px 28px;border-radius:8px 8px 0 0">
+          <img src="https://verpa.be/wp-content/uploads/2023/03/cropped-Transparant-logo-Verpa_Lukas-1-2048x594.png"
+               alt="Verpa" style="height:32px;display:block;margin-bottom:8px" />
+          <p style="color:#93c5fd;font-size:13px;margin:0">Nieuwe klachtenmelding ontvangen</p>
+        </div>
+        <div style="background:#f8fafc;padding:24px 28px;border:1px solid #e2e8f0;border-top:none">
+          <table style="width:100%;border-collapse:collapse;margin-bottom:20px">
+            <tr>
+              <td style="padding:8px 0;font-size:13px;color:#64748b;width:160px">Dossiernummer</td>
+              <td style="padding:8px 0;font-size:14px;font-weight:700;font-family:monospace;color:#1B3F6A">${esc(klacht.dossiernummer)}</td>
+            </tr>
+            <tr>
+              <td style="padding:8px 0;font-size:13px;color:#64748b">Datum melding</td>
+              <td style="padding:8px 0;font-size:14px">${datumFmt}</td>
+            </tr>
+            <tr>
+              <td style="padding:8px 0;font-size:13px;color:#64748b">Klant</td>
+              <td style="padding:8px 0;font-size:14px;font-weight:600">${esc(klacht.klantnaam)} (${esc(klacht.klantnummer)})</td>
+            </tr>
+            <tr>
+              <td style="padding:8px 0;font-size:13px;color:#64748b">Factuurnummer</td>
+              <td style="padding:8px 0;font-size:14px">${esc(klacht.factuurnummer)}</td>
+            </tr>
+            <tr>
+              <td style="padding:8px 0;font-size:13px;color:#64748b">Type klacht</td>
+              <td style="padding:8px 0;font-size:14px">${esc(klacht.typeKlacht)}</td>
+            </tr>
+            <tr>
+              <td style="padding:8px 0;font-size:13px;color:#64748b">Bedrag (excl. BTW)</td>
+              <td style="padding:8px 0;font-size:14px;font-weight:700;color:#1B3F6A">€ ${bedragFmt}</td>
+            </tr>
+            <tr>
+              <td style="padding:8px 0;font-size:13px;color:#64748b">Ingediend door</td>
+              <td style="padding:8px 0;font-size:14px">${esc(klacht.melderNaam)} (${esc(klacht.melder)})</td>
+            </tr>
+            <tr>
+              <td style="padding:8px 0;font-size:13px;color:#64748b;vertical-align:top">Omschrijving</td>
+              <td style="padding:8px 0;font-size:14px;line-height:1.5">${esc(klacht.omschrijving)}</td>
+            </tr>
+          </table>
+          ${artikelRegels ? `
+          <div style="margin-bottom:20px">
+            <p style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#94a3b8;margin:0 0 8px">Artikelregels</p>
+            <table style="width:100%;border-collapse:collapse;font-size:13px;background:#fff;border:1px solid #e2e8f0;border-radius:6px;overflow:hidden">
+              <thead>
+                <tr style="background:#1B3F6A;color:#fff">
+                  <th style="padding:8px 10px;text-align:left;font-size:11px;font-weight:700">Artikelnr.</th>
+                  <th style="padding:8px 10px;text-align:left;font-size:11px;font-weight:700">Naam</th>
+                  <th style="padding:8px 10px;text-align:center;font-size:11px;font-weight:700">UOM</th>
+                  <th style="padding:8px 10px;text-align:right;font-size:11px;font-weight:700">Aantal</th>
+                  <th style="padding:8px 10px;text-align:right;font-size:11px;font-weight:700">Prijs/st.</th>
+                </tr>
+              </thead>
+              <tbody>${artikelRegels}</tbody>
+            </table>
+          </div>
+          ` : ''}
+          <div style="margin-top:8px">
+            <a href="https://verpa-klachten.pages.dev/?dossier=${encodeURIComponent(klacht.dossiernummer)}"
+               style="display:inline-block;background:#1B3F6A;color:#fff;text-decoration:none;padding:10px 20px;border-radius:6px;font-size:13px;font-weight:600">
+              Dossier openen →
+            </a>
+          </div>
+        </div>
+        <div style="padding:14px 28px;font-size:11px;color:#94a3b8;border:1px solid #e2e8f0;border-top:none;border-radius:0 0 8px 8px;background:#fff">
+          Verpa Benelux NV · www.verpa.be · Automatisch bericht van de Klachtenapp
+        </div>
+      </div>
+    `;
+
+    await fetch('https://graph.microsoft.com/v1.0/me/sendMail', {
+      method: 'POST',
+      headers: {
+        Authorization:  `Bearer ${tok}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        message: {
+          subject: `[Klacht] ${klacht.dossiernummer} – ${klacht.klantnaam} (${klacht.typeKlacht})`,
+          body: { contentType: 'HTML', content: htmlBody },
+          toRecipients: [{ emailAddress: { address: NOTIFICATIE_EMAIL } }],
+        },
+        saveToSentItems: false,
+      }),
+    });
+    console.info(`Notificatiemail verstuurd naar ${NOTIFICATIE_EMAIL} voor ${klacht.dossiernummer}`);
+  } catch (e) {
+    // Mail mislukken blokkeert nooit het indienen
+    console.warn('Notificatiemail mislukt (niet kritiek):', e.message);
+  }
+}
 
 /* ── BUSINESS CENTRAL CONFIG ─────────────────────────────────────────
    Vereiste App Registration permissie (Delegated):
@@ -1285,6 +1404,20 @@ async function submitKlacht() {
       spUpdateItem(spItem.id, { BehandelStatus: 'Nieuw' })
         .catch(e => console.warn('BehandelStatus patch mislukt (kolom nog niet aangemaakt?):', e.message));
     }
+
+    // Notificatiemail – na SharePoint, niet-blokkerend
+    sendNotificatiemail({
+      dossiernummer,
+      klantnaam:    fields.Klantnaam,
+      klantnummer:  fields.Klantnummer,
+      factuurnummer: fields.Factuurnummer,
+      typeKlacht:   fields.TypeKlacht,
+      omschrijving: fields.Omschrijving,
+      bedrag:       fields.Bedrag,
+      melder:       currentUser.email,
+      melderNaam:   currentUser.name,
+      artikelregels,
+    });
 
     // BC sync – na SharePoint, zodat dataverlies onmogelijk is
     bcSyncKlacht({
