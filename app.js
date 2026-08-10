@@ -2726,8 +2726,40 @@ async function downloadRetourPdf(itemId) {
 
     document.body.appendChild(wrap);
 
-    // Wacht op render en afbeeldingen
-    await new Promise(function(r){ setTimeout(r, 800); });
+    // Vervang alle logo-placeholders door een inline canvas-element
+    wrap.querySelectorAll('div[style*="background-image"]').forEach(function(el) {
+      if (!el.style.backgroundImage.includes('VERPA') && !el.style.backgroundImage.includes('base64') && !el.style.backgroundImage.includes('svg')) return;
+      var logoCanvas = document.createElement('canvas');
+      logoCanvas.width  = 220;
+      logoCanvas.height = 50;
+      var ctx = logoCanvas.getContext('2d');
+      // Achtergrond
+      ctx.fillStyle = '#1B3F6A';
+      ctx.roundRect(0, 0, 220, 50, 6);
+      ctx.fill();
+      // Oranje cirkel
+      ctx.fillStyle = '#f37a2b';
+      ctx.beginPath();
+      ctx.arc(25, 25, 18, 0, Math.PI * 2);
+      ctx.fill();
+      // Witte "p" in cirkel
+      ctx.fillStyle = '#ffffff';
+      ctx.font = '900 22px Arial Black, Arial, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('p', 25, 26);
+      // "VERPA" tekst
+      ctx.font = '800 22px Helvetica Neue, Arial, sans-serif';
+      ctx.letterSpacing = '3px';
+      ctx.fillText('VERPA', 138, 26);
+      logoCanvas.style.cssText = 'display:block;height:36px;width:auto';
+      el.style.backgroundImage = 'none';
+      el.style.background = 'transparent';
+      el.appendChild(logoCanvas);
+    });
+
+    // Wacht op render
+    await new Promise(function(r){ setTimeout(r, 400); });
 
     // 5. html2canvas
     var canvas = await html2canvas(wrap, {
