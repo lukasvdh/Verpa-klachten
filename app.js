@@ -2668,140 +2668,94 @@ function printRetour(itemId)   { _retourOpenVenster(itemId, true);  }
 
 async function downloadRetourPdf(itemId) {
   var k = allKlachten.find(function(x){ return x.id === itemId; });
-  if (!k) { return; }
+  if (!k) return;
 
-  // Knop feedback
   var btn = document.activeElement;
   var origHtml = btn ? btn.innerHTML : '';
   if (btn) { btn.disabled = true; btn.innerHTML = 'Laden&#8230;'; }
 
   try {
-    // 1. Laad bibliotheken on-demand
+    // 1. Laad bibliotheken
     async function loadScript(src) {
       if (document.querySelector('script[src="'+src+'"]')) return;
-      return new Promise(function(res, rej) {
-        var s = document.createElement('script');
-        s.src = src; s.onload = res; s.onerror = rej;
-        document.head.appendChild(s);
-      });
+      return new Promise(function(res,rej){ var s=document.createElement('script');s.src=src;s.onload=res;s.onerror=rej;document.head.appendChild(s); });
     }
     await loadScript('https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js');
     await loadScript('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js');
 
-    // 2. Bouw retourkaart HTML (zonder toolbar, klaar voor render)
-    function e(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
-    var artikelregels = [];
-    try { artikelregels = JSON.parse(k.Artikelregels || '[]').filter(function(r){ return r.artnr || r.naam; }); } catch(ex){}
-    var totaal   = artikelregels.reduce(function(s,r){ return s+(parseFloat(r.aantal)||0)*(parseFloat(r.prijs)||0);},0);
-    var fmtTot   = totaal.toLocaleString('nl-BE',{minimumFractionDigits:2,maximumFractionDigits:2});
-    var qrSrc    = 'https://api.qrserver.com/v1/create-qr-code/?size=120x120&data='+encodeURIComponent('https://verpa-klachten.pages.dev/?dossier='+encodeURIComponent(k.Dossiernummer));
-    var datumFmt = k.DatumMelding ? new Date(k.DatumMelding).toLocaleDateString('nl-BE') : '-';
-    var artRows  = artikelregels.map(function(r){
-      var a=parseFloat(r.aantal)||0; var p=parseFloat(String(r.prijs||0).replace(',','.'))||0;
-      var lijn=(a*p).toLocaleString('nl-BE',{minimumFractionDigits:2,maximumFractionDigits:2});
-      return '<tr><td>'+e(r.artnr||'-')+'</td><td>'+e(r.naam||'-')+'</td>'
-        +'<td style="text-align:center">'+e(r.uom||'ST')+'</td>'
-        +'<td style="text-align:right">'+a+'</td>'
-        +'<td style="text-align:right">€ '+p.toLocaleString('nl-BE',{minimumFractionDigits:2,maximumFractionDigits:2})+'</td>'
-        +'<td style="text-align:right">€ '+lijn+'</td></tr>';
-    }).join('');
+    // 2. Haal logo op als base64 data URL (vanuit de browser, geen CORS probleem)
+    var logoDataUrl = await fetch('https://verpa.be/wp-content/uploads/2023/03/cropped-Transparant-logo-Verpa_Lukas-1-2048x594.png')
+      .then(function(r){ return r.blob(); })
+      .then(function(blob){ return new Promise(function(res){ var fr=new FileReader();fr.onload=function(e){res(e.target.result);};fr.readAsDataURL(blob); }); })
+      .catch(function(){ return null; });
 
-    // 3. Render in verborgen div (zichtbaar voor html2canvas)
-    var wrap = document.createElement('div');
-    wrap.style.cssText = 'position:fixed;left:-9999px;top:0;width:794px;background:#fff;z-index:-1;font-family:Helvetica Neue,Arial,sans-serif;font-size:12px;color:#111;padding:28px 32px;box-sizing:border-box';
-    wrap.innerHTML =
-      '<style>*{box-sizing:border-box;margin:0;padding:0}'
-      +'.hd{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:24px;padding-bottom:16px;border-bottom:2px solid #1B3F6A}'
-      +'.badge{background:#1B3F6A;color:#fff;font-size:15px;font-weight:700;padding:6px 14px;border-radius:6px;display:inline-block}'
-      +'.stitle{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:#94A3B8;margin-bottom:8px}'
-      +'.igrid{display:grid;grid-template-columns:1fr 1fr;gap:10px 24px}'
-      +'.iitem label{font-size:9px;text-transform:uppercase;letter-spacing:.07em;color:#94A3B8;display:block;margin-bottom:2px}'
-      +'.iitem span{font-size:13px;font-weight:600;color:#0F172A}'
-      +'table{width:100%;border-collapse:collapse;font-size:11.5px}'
-      +'thead tr{background:#1B3F6A;color:#fff}'
-      +'thead th{padding:7px 10px;text-align:left;font-weight:700;font-size:10px;text-transform:uppercase}'
-      +'tbody tr:nth-child(even){background:#F8FAFC}'
-      +'tbody td{padding:6px 10px;border-bottom:1px solid #E2E8F0}'
-      +'.trow td{font-weight:700;font-size:13px;border-top:2px solid #1B3F6A;border-bottom:none;padding-top:8px}'
-      +'.bot{display:flex;gap:24px;margin-top:24px;padding-top:16px;border-top:1px solid #E2E8F0}'
-      +'.sbox{flex:1;border:1.5px dashed #CBD5E1;border-radius:8px;padding:12px 16px;min-height:100px}'
-      +'.slbl{font-size:9px;text-transform:uppercase;letter-spacing:.08em;color:#94A3B8;font-weight:700;margin-bottom:4px}'
-      +'.snam{font-size:11px;color:#64748B;margin-top:6px}'
-      +'.qrb{display:flex;flex-direction:column;align-items:center;gap:6px}'
-      +'.qrb img{width:110px;height:110px}'
-      +'.qrl{font-size:9px;color:#94A3B8;text-align:center;max-width:110px;line-height:1.4}'
-      +'.ft{margin-top:20px;font-size:9px;color:#94A3B8;text-align:center;border-top:1px solid #E2E8F0;padding-top:10px}'
-      +'</style>'
-      // Header
-      +'<div class="hd">'
-      +'<div><div style="background:#1B3F6A;border-radius:8px;padding:8px 16px;display:inline-block;margin-bottom:6px">'
-      +'<svg xmlns="http://www.w3.org/2000/svg" width="160" height="36" viewBox="0 0 160 36">'+'<rect width="160" height="36" rx="4" fill="#1B3F6A"/>'+'<text x="12" y="26" font-family="Helvetica Neue,Arial,sans-serif" font-size="22" font-weight="800" fill="#ffffff" letter-spacing="3">VERPA</text>'+'</svg>'
-      +'</div><div style="font-size:11px;color:#64748B;margin-top:2px">Verkoop Retour Verzending</div></div>'
-      +'<div style="text-align:right"><div class="badge">'+e(k.Dossiernummer)+'</div>'
-      +'<div style="font-size:10px;color:#64748B;margin-top:6px">Opgemaakt op '+new Date().toLocaleDateString('nl-BE')+'</div></div>'
-      +'</div>'
-      // Klantgegevens
-      +'<div style="margin-bottom:20px;display:flex;gap:24px"><div style="flex:1">'
-      +'<div class="stitle">Klantgegevens</div><div class="igrid">'
-      +'<div class="iitem"><label>Klantnaam</label><span>'+e(k.Klantnaam)+'</span></div>'
-      +'<div class="iitem"><label>Klantnummer</label><span>'+e(k.Klantnummer)+'</span></div>'
-      +'<div class="iitem"><label>Factuurnummer</label><span>'+e(k.Factuurnummer)+'</span></div>'
-      +'<div class="iitem"><label>Datum melding</label><span>'+datumFmt+'</span></div>'
-      +'<div class="iitem"><label>Type klacht</label><span>'+e(k.TypeKlacht)+'</span></div>'
-      +'<div class="iitem"><label>Ingediend door</label><span>'+e(k.MelderNaam||k.Melder)+'</span></div>'
-      +'</div></div>'
-      +(k.Straat||k.straat ? '<div style="min-width:160px;background:#F8FAFC;border:1px solid #E2E8F0;border-radius:8px;padding:14px 16px">'
-        +'<div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:#94A3B8;margin-bottom:8px">Retouradres klant</div>'
-        +'<div style="font-size:13px;font-weight:600;line-height:1.7;color:#0F172A">'
-        +e(k.Klantnaam)+'<br>'
-        +e(k.Straat||k.straat||'')+'<br>'
-        +e(((k.Postcode||k.postcode||'')+' '+(k.Gemeente||k.gemeente||'')).trim())+'<br>Belgi&euml;'
-        +'</div></div>' : '')
-      +'</div>'
-      // Artikelen
-      +'<div style="margin-bottom:20px"><div class="stitle">Te retourneren artikelen</div>'
-      +'<table><thead><tr><th>Artikelnr.</th><th>Artikelnaam</th><th style="text-align:center">UOM</th>'
-      +'<th style="text-align:right">Aantal</th><th style="text-align:right">Prijs/st.</th><th style="text-align:right">Totaal</th></tr></thead>'
-      +'<tbody>'+artRows+'<tr class="trow"><td colspan="5" style="text-align:right">Totaal (excl. BTW)</td>'
-      +'<td style="text-align:right">€ '+fmtTot+'</td></tr></tbody></table></div>'
-      // Handtekeningen + QR
-      +'<div class="bot">'
-      +'<div class="sbox" style="flex:2"><div class="slbl">Handtekening klant voor ontvangst retour</div>'
-      +'<div style="height:60px"></div>'
-      +'<div class="snam">Naam: _________________________ &nbsp; Datum: _____________</div></div>'
-      +'<div class="sbox" style="flex:1.2"><div class="slbl">Handtekening chauffeur</div>'
-      +'<div style="height:60px"></div>'
-      +'<div class="snam">Naam: _________________________</div></div>'
-      +'<div class="qrb"><img src="'+qrSrc+'" alt="QR" crossorigin="anonymous"/>'
-      +'<div class="qrl">Scan voor dossier '+e(k.Dossiernummer)+'</div></div>'
-      +'</div>'
-      +'<div class="ft">Verpa Benelux NV &nbsp;&middot;&nbsp; www.verpa.be &nbsp;&middot;&nbsp; Dossier '+e(k.Dossiernummer)+'</div>';
+    // 3. Gebruik buildRetourHtml maar vervang logo src door data URL
+    var html = buildRetourHtml(k);
+    if (logoDataUrl) {
+      html = html.replace(
+        'https://verpa.be/wp-content/uploads/2023/03/cropped-Transparant-logo-Verpa_Lukas-1-2048x594.png',
+        logoDataUrl
+      );
+    }
+    // Verwijder auto-print script en style tag wrapper
+    html = html.replace('<script>window.onload = function(){ window.print(); }<\/script>', '');
 
-    document.body.appendChild(wrap);
+    // 4. Render in verborgen iframe (betrouwbaarder dan div voor complexe CSS)
+    var iframe = document.createElement('iframe');
+    iframe.style.cssText = 'position:fixed;left:-9999px;top:0;width:794px;height:1123px;border:none;visibility:hidden';
+    document.body.appendChild(iframe);
 
-    // Wacht even zodat afbeeldingen geladen zijn
-    await new Promise(function(r){ setTimeout(r, 800); });
+    await new Promise(function(res) {
+      iframe.onload = res;
+      iframe.contentDocument.open();
+      iframe.contentDocument.write(html);
+      iframe.contentDocument.close();
+    });
 
-    // 4. html2canvas → jsPDF
-    var canvas = await html2canvas(wrap, {
+    // Wacht op afbeeldingen
+    await new Promise(function(r){ setTimeout(r, 1200); });
+
+    // 5. html2canvas op iframe body
+    var canvas = await html2canvas(iframe.contentDocument.body, {
       scale: 2,
       useCORS: true,
-      allowTaint: false,
+      allowTaint: true,
       backgroundColor: '#ffffff',
       width: 794,
       windowWidth: 794,
     });
 
-    document.body.removeChild(wrap);
+    document.body.removeChild(iframe);
 
-    var imgData = canvas.toDataURL('image/jpeg', 0.95);
-    var { jsPDF } = window.jspdf;
-    var pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+    // 6. canvas → PDF
+    var imgData = canvas.toDataURL('image/jpeg', 0.97);
+    var jsPDFLib = window.jspdf.jsPDF;
+    var pdf = new jsPDFLib({ orientation: 'portrait', unit: 'mm', format: 'a4' });
     var pdfW = pdf.internal.pageSize.getWidth();
     var pdfH = (canvas.height * pdfW) / canvas.width;
-    pdf.addImage(imgData, 'JPEG', 0, 0, pdfW, pdfH);
-    pdf.save('Retourkaart_' + k.Dossiernummer + '.pdf');
 
+    // Meerdere pagina's indien nodig
+    var pageH = pdf.internal.pageSize.getHeight();
+    if (pdfH <= pageH) {
+      pdf.addImage(imgData, 'JPEG', 0, 0, pdfW, pdfH);
+    } else {
+      var pageCanvas = document.createElement('canvas');
+      var pageHeightPx = Math.round(canvas.width * pageH / pdfW);
+      pageCanvas.width = canvas.width;
+      pageCanvas.height = pageHeightPx;
+      var ctx = pageCanvas.getContext('2d');
+      var pagesCount = Math.ceil(canvas.height / pageHeightPx);
+      for (var page = 0; page < pagesCount; page++) {
+        ctx.fillStyle = '#fff';
+        ctx.fillRect(0, 0, pageCanvas.width, pageCanvas.height);
+        ctx.drawImage(canvas, 0, -page * pageHeightPx);
+        var pageData = pageCanvas.toDataURL('image/jpeg', 0.97);
+        if (page > 0) pdf.addPage();
+        pdf.addImage(pageData, 'JPEG', 0, 0, pdfW, pageH);
+      }
+    }
+
+    pdf.save('Retourkaart_' + k.Dossiernummer + '.pdf');
     showToast('PDF gedownload.', 'success');
 
   } catch(err) {
