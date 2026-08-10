@@ -2224,8 +2224,8 @@ function buildRetourHtml(k) {
 <body>
   <div class="header">
     <div class="header-left">
-      <div style="background:#1B3F6A;border-radius:8px;padding:8px 16px;display:inline-block;margin-bottom:6px">
-        <img src="${VERPA_LOGO_URL}" alt="Verpa" style="height:36px;display:block"/>
+      <div style="background:#1B3F6A;border-radius:8px;padding:4px 12px;display:inline-flex;align-items:center;margin-bottom:6px;height:52px">
+        <div style="height:36px;width:180px;background-image:url('${VERPA_LOGO_URL}');background-repeat:no-repeat;background-size:contain;background-position:center left"></div>
       </div>
       <div class="sub">Verkoop Retour Verzending</div>
     </div>
@@ -2557,8 +2557,8 @@ function printRetour(itemId) {
 <body>
   <div class="header">
     <div class="header-left">
-      <div style="background:#1B3F6A;border-radius:8px;padding:8px 16px;display:inline-block;margin-bottom:6px">
-        <img src="${VERPA_LOGO_URL}" alt="Verpa" style="height:36px;display:block"/>
+      <div style="background:#1B3F6A;border-radius:8px;padding:4px 12px;display:inline-flex;align-items:center;margin-bottom:6px;height:52px">
+        <div style="height:36px;width:180px;background-image:url('${VERPA_LOGO_URL}');background-repeat:no-repeat;background-size:contain;background-position:center left"></div>
       </div>
       <div class="sub">Verkoop Retour Verzending</div>
     </div>
@@ -2724,38 +2724,29 @@ async function downloadRetourPdf(itemId) {
       } catch(e) { console.warn('Logo fetch mislukt:', e.message); }
     }
 
-    // 4. Render in verborgen div in de hoofdpagina (geen iframe - html2canvas werkt beter)
-    var container = document.createElement('div');
-    container.style.cssText = 'position:fixed;left:-9999px;top:0;width:794px;background:#fff;z-index:-9999;font-family:Helvetica Neue,Arial,sans-serif';
+    // 4. Render via verborgen iframe op exacte A4-breedte
+    var iframe = document.createElement('iframe');
+    iframe.style.cssText = 'position:fixed;left:-9999px;top:0;width:794px;height:1px;border:none;visibility:visible;opacity:0;pointer-events:none';
+    document.body.appendChild(iframe);
 
-    // Extraheer body-inhoud en style uit de volledige HTML
-    var bodyMatch = html.match(/<body[^>]*>([\s\S]*)<\/body>/i);
-    var styleMatch = html.match(/<style[^>]*>([\s\S]*?)<\/style>/gi);
-    var bodyContent = bodyMatch ? bodyMatch[1] : html;
+    await new Promise(function(res) {
+      iframe.onload = res;
+      iframe.srcdoc = html;
+    });
 
-    // Voeg styles in als <style> elementen
-    if (styleMatch) {
-      styleMatch.forEach(function(s) {
-        var styleEl = document.createElement('div');
-        styleEl.innerHTML = s;
-        container.appendChild(styleEl.firstChild);
-      });
-    }
+    // Wacht op render + afbeeldingen (background-image heeft geen load event)
+    await new Promise(function(r){ setTimeout(r, 1500); });
 
-    // Voeg body content in
-    var contentDiv = document.createElement('div');
-    contentDiv.innerHTML = bodyContent;
-    container.appendChild(contentDiv);
+    var iframeDoc = iframe.contentDocument || iframe.contentWindow.document;
+    var iframeBody = iframeDoc.body;
+    iframeBody.style.margin = '0';
+    iframeBody.style.padding = '28px 32px';
+    iframeBody.style.boxSizing = 'border-box';
 
-    document.body.appendChild(container);
-
-    // Wacht op afbeeldingen
-    await new Promise(function(r){ setTimeout(r, 1000); });
-
-    // 5. html2canvas op container
-    var canvas = await html2canvas(container, {
+    // 5. html2canvas op iframe body
+    var canvas = await html2canvas(iframeBody, {
       scale: 2,
-      useCORS: true,
+      useCORS: false,
       allowTaint: true,
       backgroundColor: '#ffffff',
       width: 794,
@@ -2763,7 +2754,7 @@ async function downloadRetourPdf(itemId) {
       logging: false,
     });
 
-    document.body.removeChild(container);
+    document.body.removeChild(iframe);
 
     // 6. canvas → PDF
     var imgData = canvas.toDataURL('image/jpeg', 0.97);
