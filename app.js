@@ -42,7 +42,7 @@ const GRAPH_SCOPES = ['User.Read', 'Sites.ReadWrite.All', 'Mail.Send'];
    ─────────────────────────────────────────────────────────────────────────── */
 const NOTIFICATIE_EMAIL = 'Ils@verpa.be';
 const VERPA_LOGO_URL = 'https://verpa.be/wp-content/uploads/2023/03/cropped-Transparant-logo-Verpa_Lukas-1-2048x594.png';
-var   VERPA_LOGO_B64 = null; // gevuld bij onSignedIn via blob fetch
+const VERPA_LOGO_B64 = 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyMjAgNTAiIHdpZHRoPSIyMjAiIGhlaWdodD0iNTAiPgogIDxyZWN0IHdpZHRoPSIyMjAiIGhlaWdodD0iNTAiIHJ4PSI2IiBmaWxsPSIjMUIzRjZBIi8+CiAgPGNpcmNsZSBjeD0iMjUiIGN5PSIyNSIgcj0iMTgiIGZpbGw9IiNmMzdhMmIiLz4KICA8dGV4dCB4PSIyNSIgeT0iMzIiIGZvbnQtZmFtaWx5PSJBcmlhbCBCbGFjayxBcmlhbCxzYW5zLXNlcmlmIiBmb250LXNpemU9IjIyIiBmb250LXdlaWdodD0iOTAwIiBmaWxsPSJ3aGl0ZSIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZG9taW5hbnQtYmFzZWxpbmU9Im1pZGRsZSI+cDwvdGV4dD4KICA8dGV4dCB4PSIxMjAiIHk9IjI2IiBmb250LWZhbWlseT0iSGVsdmV0aWNhIE5ldWUsQXJpYWwsc2Fucy1zZXJpZiIgZm9udC1zaXplPSIyNCIgZm9udC13ZWlnaHQ9IjgwMCIgZmlsbD0id2hpdGUiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGxldHRlci1zcGFjaW5nPSIzIj5WRVJQQTwvdGV4dD4KPC9zdmc+'; // hardcoded SVG base64 - geen CORS probleem
 const SP_GESPREK_LIST   = 'KlachtenGesprekken'; // SharePoint lijst voor gesprekberichten
 
 async function sendNotificatiemail(klacht) {
@@ -304,17 +304,7 @@ function showLogin() {
 }
 
 async function onSignedIn(account) {
-  // Logo alvast als base64 laden voor PDF-generatie (geen CORS probleem: browser-fetch)
-  if (!VERPA_LOGO_B64) {
-    fetch(VERPA_LOGO_URL)
-      .then(function(r){ return r.blob(); })
-      .then(function(blob){
-        var fr = new FileReader();
-        fr.onload = function(e){ VERPA_LOGO_B64 = e.target.result; };
-        fr.readAsDataURL(blob);
-      })
-      .catch(function(){});
-  }
+  // Logo is hardcoded als base64 SVG (geen externe fetch nodig)
   // Verberg login scherm zodra we een account hebben
   document.getElementById('loginScreen').classList.add('hidden');
   const token = await getToken(account);
@@ -2225,7 +2215,7 @@ function buildRetourHtml(k) {
   <div class="header">
     <div class="header-left">
       <div style="background:#1B3F6A;border-radius:8px;padding:4px 12px;display:inline-flex;align-items:center;margin-bottom:6px;height:52px">
-        <div style="height:36px;width:180px;background-image:url('${VERPA_LOGO_URL}');background-repeat:no-repeat;background-size:contain;background-position:center left"></div>
+        <div style="height:36px;width:180px;background-image:url('${VERPA_LOGO_B64}');background-repeat:no-repeat;background-size:contain;background-position:center left"></div>
       </div>
       <div class="sub">Verkoop Retour Verzending</div>
     </div>
@@ -2558,7 +2548,7 @@ function printRetour(itemId) {
   <div class="header">
     <div class="header-left">
       <div style="background:#1B3F6A;border-radius:8px;padding:4px 12px;display:inline-flex;align-items:center;margin-bottom:6px;height:52px">
-        <div style="height:36px;width:180px;background-image:url('${VERPA_LOGO_URL}');background-repeat:no-repeat;background-size:contain;background-position:center left"></div>
+        <div style="height:36px;width:180px;background-image:url('${VERPA_LOGO_B64}');background-repeat:no-repeat;background-size:contain;background-position:center left"></div>
       </div>
       <div class="sub">Verkoop Retour Verzending</div>
     </div>
@@ -2700,16 +2690,7 @@ async function downloadRetourPdf(itemId) {
     await loadScript('https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js');
     await loadScript('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js');
 
-    // 2. Zorg voor logo base64
-    if (!VERPA_LOGO_B64) {
-      try {
-        var blob = await fetch(VERPA_LOGO_URL).then(function(r){ return r.blob(); });
-        VERPA_LOGO_B64 = await new Promise(function(res){
-          var fr = new FileReader(); fr.onload = function(e){ res(e.target.result); }; fr.readAsDataURL(blob);
-        });
-      } catch(e) { console.warn('Logo fetch mislukt:', e.message); }
-    }
-
+    // 2. Logo is hardcoded als base64 - geen fetch nodig
     // 3. Bouw retourkaart HTML en vervang logo URL door base64
     var html = buildRetourHtml(k);
     html = html.replace('<script>window.onload = function(){ window.print(); }<\/script>', '');
