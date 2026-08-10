@@ -2634,9 +2634,10 @@ function _retourOpenVenster(itemId, autoPrint) {
 
   var html = buildRetourHtml(k);
 
-  // Vervang auto-print door een toolbar met knoppen
+  // Vervang auto-print door een toolbar met knoppen (verdwijnt bij printen via inline style tag)
   var toolbar = `
-    <div class="no-print" style="position:fixed;top:0;left:0;right:0;background:#1B3F6A;color:#fff;padding:10px 20px;display:flex;align-items:center;gap:10px;z-index:9999;font-family:'Helvetica Neue',Arial,sans-serif;font-size:13px">
+    <style>@media print{.verpa-toolbar{display:none!important}body{padding-top:0!important}}</style>
+    <div class="verpa-toolbar" style="position:fixed;top:0;left:0;right:0;background:#1B3F6A;color:#fff;padding:10px 20px;display:flex;align-items:center;gap:10px;z-index:9999;font-family:'Helvetica Neue',Arial,sans-serif;font-size:13px">
       <span style="font-weight:700;flex:1">Retourkaart – ${esc(k.Dossiernummer)}</span>
       <button onclick="window.print()" style="background:#fff;color:#1B3F6A;border:none;border-radius:6px;padding:7px 16px;font-size:13px;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;gap:6px">
         &#128424; Afdrukken
@@ -2645,7 +2646,7 @@ function _retourOpenVenster(itemId, autoPrint) {
         Sluiten
       </button>
     </div>
-    <div class="no-print" style="height:52px"></div>
+    <div class="verpa-toolbar" style="height:52px"></div>
   `;
 
   // Verwijder auto-print script, voeg toolbar toe na <body>
