@@ -41,6 +41,8 @@ const GRAPH_SCOPES = ['User.Read', 'Sites.ReadWrite.All', 'Mail.Send'];
    Ontvangt een melding bij elk nieuw ingediend ticket.
    ─────────────────────────────────────────────────────────────────────────── */
 const NOTIFICATIE_EMAIL = 'Ils@verpa.be';
+const VERPA_LOGO_URL = 'https://verpa.be/wp-content/uploads/2023/03/cropped-Transparant-logo-Verpa_Lukas-1-2048x594.png';
+var   VERPA_LOGO_B64 = null; // gevuld bij onSignedIn via blob fetch
 const SP_GESPREK_LIST   = 'KlachtenGesprekken'; // SharePoint lijst voor gesprekberichten
 
 async function sendNotificatiemail(klacht) {
@@ -302,6 +304,17 @@ function showLogin() {
 }
 
 async function onSignedIn(account) {
+  // Logo alvast als base64 laden voor PDF-generatie (geen CORS probleem: browser-fetch)
+  if (!VERPA_LOGO_B64) {
+    fetch(VERPA_LOGO_URL)
+      .then(function(r){ return r.blob(); })
+      .then(function(blob){
+        var fr = new FileReader();
+        fr.onload = function(e){ VERPA_LOGO_B64 = e.target.result; };
+        fr.readAsDataURL(blob);
+      })
+      .catch(function(){});
+  }
   // Verberg login scherm zodra we een account hebben
   document.getElementById('loginScreen').classList.add('hidden');
   const token = await getToken(account);
@@ -2212,7 +2225,7 @@ function buildRetourHtml(k) {
   <div class="header">
     <div class="header-left">
       <div style="background:#1B3F6A;border-radius:8px;padding:8px 16px;display:inline-block;margin-bottom:6px">
-        <svg xmlns="http://www.w3.org/2000/svg" width="180" height="44" viewBox="0 0 180 44"><rect width="180" height="44" rx="6" fill="#1B3F6A"/><circle cx="22" cy="22" r="14" fill="#f37a2b"/><text x="20" y="28" font-family="Arial,sans-serif" font-size="16" font-weight="900" fill="#fff" text-anchor="middle">V</text><text x="46" y="30" font-family="Helvetica Neue,Arial,sans-serif" font-size="20" font-weight="800" fill="#ffffff" letter-spacing="2">VERPA</text></svg>
+        <img src="${VERPA_LOGO_URL}" alt="Verpa" style="height:36px;display:block"/>
       </div>
       <div class="sub">Verkoop Retour Verzending</div>
     </div>
@@ -2545,7 +2558,7 @@ function printRetour(itemId) {
   <div class="header">
     <div class="header-left">
       <div style="background:#1B3F6A;border-radius:8px;padding:8px 16px;display:inline-block;margin-bottom:6px">
-        <svg xmlns="http://www.w3.org/2000/svg" width="180" height="44" viewBox="0 0 180 44"><rect width="180" height="44" rx="6" fill="#1B3F6A"/><circle cx="22" cy="22" r="14" fill="#f37a2b"/><text x="20" y="28" font-family="Arial,sans-serif" font-size="16" font-weight="900" fill="#fff" text-anchor="middle">V</text><text x="46" y="30" font-family="Helvetica Neue,Arial,sans-serif" font-size="20" font-weight="800" fill="#ffffff" letter-spacing="2">VERPA</text></svg>
+        <img src="${VERPA_LOGO_URL}" alt="Verpa" style="height:36px;display:block"/>
       </div>
       <div class="sub">Verkoop Retour Verzending</div>
     </div>
@@ -2683,9 +2696,33 @@ async function downloadRetourPdf(itemId) {
     await loadScript('https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js');
     await loadScript('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js');
 
-    // 2. Bouw HTML
+    // 2. Bouw HTML en vervang logo door base64 zodat html2canvas het altijd toont
     var html = buildRetourHtml(k);
     html = html.replace('<script>window.onload = function(){ window.print(); }<\/script>', '');
+    // Wacht max 2s op logo base64, anders doorgaan zonder
+    if (!VERPA_LOGO_B64) {
+      await new Promise(function(res){
+        var waited = 0;
+        var t = setInterval(function(){
+          waited += 100;
+          if (VERPA_LOGO_B64 || waited >= 2000) { clearInterval(t); res(); }
+        }, 100);
+      });
+    }
+    if (VERPA_LOGO_B64) {
+      html = html.split(VERPA_LOGO_URL).join(VERPA_LOGO_B64);
+    } else {
+      // Fallback: laad logo opnieuw zonder crossOrigin restrictie
+      try {
+        var logoBlob = await fetch(VERPA_LOGO_URL).then(function(r){ return r.blob(); });
+        VERPA_LOGO_B64 = await new Promise(function(res){
+          var fr = new FileReader();
+          fr.onload = function(e){ res(e.target.result); };
+          fr.readAsDataURL(logoBlob);
+        });
+        html = html.split(VERPA_LOGO_URL).join(VERPA_LOGO_B64);
+      } catch(e) { console.warn('Logo fetch mislukt:', e.message); }
+    }
 
     // 4. Render in verborgen iframe (betrouwbaarder dan div voor complexe CSS)
     var iframe = document.createElement('iframe');
