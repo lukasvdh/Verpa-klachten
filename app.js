@@ -2205,7 +2205,7 @@ function buildRetourHtml(k) {
   .qr-box .qr-label { font-size: 9px; color: #94A3B8; text-align: center; max-width: 110px; line-height: 1.4; }
   .type-pill { display: inline-block; background: #EBF3FA; color: #1B3F6A; font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 20px; }
   .footer { margin-top: 20px; font-size: 9px; color: #94A3B8; text-align: center; border-top: 1px solid #E2E8F0; padding-top: 10px; }
-  @media print { body { padding: 16px 20px; } @page { margin: 12mm; } }
+  @media print { body { padding: 16px 20px; } @page { margin: 12mm; } .no-print { display: none !important; } }
 </style>
 </head>
 <body>
@@ -2636,7 +2636,7 @@ function _retourOpenVenster(itemId, autoPrint) {
 
   // Vervang auto-print door een toolbar met knoppen
   var toolbar = `
-    <div style="position:fixed;top:0;left:0;right:0;background:#1B3F6A;color:#fff;padding:10px 20px;display:flex;align-items:center;gap:10px;z-index:9999;font-family:'Helvetica Neue',Arial,sans-serif;font-size:13px">
+    <div class="no-print" style="position:fixed;top:0;left:0;right:0;background:#1B3F6A;color:#fff;padding:10px 20px;display:flex;align-items:center;gap:10px;z-index:9999;font-family:'Helvetica Neue',Arial,sans-serif;font-size:13px">
       <span style="font-weight:700;flex:1">Retourkaart – ${esc(k.Dossiernummer)}</span>
       <button onclick="window.print()" style="background:#fff;color:#1B3F6A;border:none;border-radius:6px;padding:7px 16px;font-size:13px;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;gap:6px">
         &#128424; Afdrukken
@@ -2645,7 +2645,7 @@ function _retourOpenVenster(itemId, autoPrint) {
         Sluiten
       </button>
     </div>
-    <div style="height:52px"></div>
+    <div class="no-print" style="height:52px"></div>
   `;
 
   // Verwijder auto-print script, voeg toolbar toe na <body>
