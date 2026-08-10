@@ -2724,32 +2724,46 @@ async function downloadRetourPdf(itemId) {
       } catch(e) { console.warn('Logo fetch mislukt:', e.message); }
     }
 
-    // 4. Render in verborgen iframe (betrouwbaarder dan div voor complexe CSS)
-    var iframe = document.createElement('iframe');
-    iframe.style.cssText = 'position:fixed;left:-9999px;top:0;width:794px;height:1123px;border:none;visibility:hidden';
-    document.body.appendChild(iframe);
+    // 4. Render in verborgen div in de hoofdpagina (geen iframe - html2canvas werkt beter)
+    var container = document.createElement('div');
+    container.style.cssText = 'position:fixed;left:-9999px;top:0;width:794px;background:#fff;z-index:-9999;font-family:Helvetica Neue,Arial,sans-serif';
 
-    await new Promise(function(res) {
-      iframe.onload = res;
-      iframe.contentDocument.open();
-      iframe.contentDocument.write(html);
-      iframe.contentDocument.close();
-    });
+    // Extraheer body-inhoud en style uit de volledige HTML
+    var bodyMatch = html.match(/<body[^>]*>([\s\S]*)<\/body>/i);
+    var styleMatch = html.match(/<style[^>]*>([\s\S]*?)<\/style>/gi);
+    var bodyContent = bodyMatch ? bodyMatch[1] : html;
+
+    // Voeg styles in als <style> elementen
+    if (styleMatch) {
+      styleMatch.forEach(function(s) {
+        var styleEl = document.createElement('div');
+        styleEl.innerHTML = s;
+        container.appendChild(styleEl.firstChild);
+      });
+    }
+
+    // Voeg body content in
+    var contentDiv = document.createElement('div');
+    contentDiv.innerHTML = bodyContent;
+    container.appendChild(contentDiv);
+
+    document.body.appendChild(container);
 
     // Wacht op afbeeldingen
-    await new Promise(function(r){ setTimeout(r, 1200); });
+    await new Promise(function(r){ setTimeout(r, 1000); });
 
-    // 5. html2canvas op iframe body
-    var canvas = await html2canvas(iframe.contentDocument.body, {
+    // 5. html2canvas op container
+    var canvas = await html2canvas(container, {
       scale: 2,
       useCORS: true,
       allowTaint: true,
       backgroundColor: '#ffffff',
       width: 794,
       windowWidth: 794,
+      logging: false,
     });
 
-    document.body.removeChild(iframe);
+    document.body.removeChild(container);
 
     // 6. canvas → PDF
     var imgData = canvas.toDataURL('image/jpeg', 0.97);
