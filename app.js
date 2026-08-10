@@ -777,7 +777,7 @@ function openDetail(id){
   var cnHtml=k.CreditnotaNr?'<div><div class="d-lbl">Creditnota</div><div class="d-val" style="font-family:monospace;font-weight:700;color:var(--green)">'+k.CreditnotaNr+'</div></div>':'';
   document.getElementById('modalBody').innerHTML='<div class="detail-grid"><div><div class="d-lbl">Dossiernummer</div><div class="d-val" style="font-family:monospace;font-size:15px;font-weight:700;color:var(--navy)">'+k.Dossiernummer+'</div></div><div><div class="d-lbl">Goedkeuringsstatus</div><div class="d-val">'+statusBadge(k.Status)+'</div></div><div class="d-full"><div class="d-lbl">Behandelstatus</div><div class="behandel-seg" id="behandelSeg">'+['Nieuw','In behandeling','Afgehandeld'].map(function(s){var cur=k.BehandelStatus||'Nieuw';var cls='behandel-seg-btn bs-btn-'+s.replace(/ /g,'-').toLowerCase()+(cur===s?' active':'');return'<button class="'+cls+'" onclick="updateBehandelStatus(\''+k.id+'\',\''+s+'\',this)"><span class="seg-dot"></span>'+s+'</button>';}).join('')+'</div></div><div><div class="d-lbl">Datum melding</div><div class="d-val">'+fmtDate(k.DatumMelding)+'</div></div><div><div class="d-lbl">Type klacht</div><div class="d-val">'+(typePill[k.TypeKlacht]||k.TypeKlacht)+'</div></div><div><div class="d-lbl">Klantnaam</div><div class="d-val">'+k.Klantnaam+'</div></div><div><div class="d-lbl">Klantnummer</div><div class="d-val">'+k.Klantnummer+'</div></div><div><div class="d-lbl">Factuurnummer</div><div class="d-val">'+k.Factuurnummer+'</div></div>'+(k.BeoordeeldDoor?'<div><div class="d-lbl">Beoordeeld door</div><div class="d-val">'+k.BeoordeeldDoor+'</div></div>':'')+'<div><div class="d-lbl">Datum afhandeling</div><div class="d-val" id="datumAfhandelingVal">'+(k.DatumAfhandeling?new Date(k.DatumAfhandeling).toLocaleDateString('nl-BE'):'\u2013')+'</div></div>'+cnHtml+'<div class="d-full"><div class="d-lbl">Omschrijving</div><div class="d-val desc">'+k.Omschrijving+'</div></div><div><div class="d-lbl">Ingediend door</div><div class="d-val">'+(k.MelderNaam||'\u2013')+'</div></div></div>'+artHtml+rejectHtml;
   var foot=document.getElementById('modalFooter');
-  var retourBtn='<button class="btn btn-secondary" onclick="previewRetour(\''+k.id+'\')" style="display:inline-flex;align-items:center;gap:6px">&#128196; Retourkaart</button>'+'<button onclick="downloadRetourPdf(\''+k.id+'\')" style="display:inline-flex;align-items:center;gap:6px;padding:7px 14px;border-radius:8px;border:none;cursor:pointer;font-size:13px;font-weight:600;background:#DC2626;color:#fff;white-space:nowrap" title="Download als PDF">&#11015; Download PDF</button>';
+  var retourBtn='<button onclick="printRetour(\''+k.id+'\')" style="display:inline-flex;align-items:center;gap:6px;padding:7px 14px;border-radius:8px;border:1.5px solid #1B3F6A;cursor:pointer;font-size:13px;font-weight:600;background:#fff;color:#1B3F6A;white-space:nowrap">&#128424; Afdrukken</button>'+'<button onclick="downloadRetourPdf(\''+k.id+'\')" style="display:inline-flex;align-items:center;gap:6px;padding:7px 14px;border-radius:8px;border:none;cursor:pointer;font-size:13px;font-weight:600;background:#DC2626;color:#fff;white-space:nowrap">&#11015; Download PDF</button>';
   var delBtn=currentUser.isAdmin?'<button class="btn btn-danger" style="margin-left:auto" onclick="deleteKlacht(\''+k.id+'\',\''+k.Dossiernummer+'\')" title="Verwijderen">&#128465; Verwijderen</button>':'';
   if(k.Status==='Wachtend op goedkeuring'){foot.innerHTML='<button class="btn btn-success" onclick="approveKlacht(\''+k.id+'\')">&#10003; Goedkeuren</button><button class="btn btn-danger" onclick="openReject(\''+k.id+'\')">&#10007; Weigeren</button><button class="btn btn-ghost" onclick="closeModal()">Sluiten</button>'+retourBtn+delBtn;}
   else if(k.Status==='Goedgekeurd'){foot.innerHTML='<div style="display:flex;align-items:center;gap:8px;flex:1;flex-wrap:wrap"><div style="display:flex;align-items:center;border:1.5px solid var(--border);border-radius:8px;overflow:hidden;background:var(--surface)"><span style="padding:6px 10px;background:var(--gray-bg);color:var(--muted);font-size:12px;font-weight:600;border-right:1px solid var(--border);white-space:nowrap">Creditnota</span><input id="creditnota-input" type="text" placeholder="bijv. CN2026-00123 (optioneel)" value="'+(k.CreditnotaNr||'')+'" style="border:none;padding:6px 10px;font-size:13px;color:var(--text);outline:none;width:220px;font-family:monospace;font-weight:600"/></div><button class="btn btn-success btn-sm" onclick="saveCreditnota(\''+k.id+'\')">Opslaan</button></div><button class="btn btn-ghost" onclick="closeModal()">Sluiten</button>'+retourBtn+delBtn;}
@@ -2665,112 +2665,140 @@ function _retourOpenVenster(itemId, autoPrint) {
 function previewRetour(itemId) { _retourOpenVenster(itemId, false); }
 function printRetour(itemId)   { _retourOpenVenster(itemId, true);  }
 
-function downloadRetourPdf(itemId) {
+async function downloadRetourPdf(itemId) {
   var k = allKlachten.find(function(x){ return x.id === itemId; });
-  if (!k) return;
+  if (!k) { return; }
 
-  // Genereer HTML rechtstreeks (zelfde logica als printRetour maar met PDF-toolbar)
-  var artikelregels = [];
-  try { artikelregels = JSON.parse(k.Artikelregels || '[]').filter(function(r){ return r.artnr || r.naam; }); } catch(e){}
+  // Knop feedback
+  var btn = document.activeElement;
+  var origHtml = btn ? btn.innerHTML : '';
+  if (btn) { btn.disabled = true; btn.innerHTML = 'Laden&#8230;'; }
 
-  var totaal     = artikelregels.reduce(function(s,r){ return s+(parseFloat(r.aantal)||0)*(parseFloat(r.prijs)||0);},0);
-  var fmtTot     = totaal.toLocaleString('nl-BE',{minimumFractionDigits:2,maximumFractionDigits:2});
-  var qrUrl      = 'https://verpa-klachten.pages.dev/?dossier='+encodeURIComponent(k.Dossiernummer);
-  var qrSrc      = 'https://api.qrserver.com/v1/create-qr-code/?size=120x120&data='+encodeURIComponent(qrUrl);
-  var datumFmt   = k.DatumMelding ? new Date(k.DatumMelding).toLocaleDateString('nl-BE') : '-';
-  function e(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+  try {
+    // 1. Laad bibliotheken on-demand
+    async function loadScript(src) {
+      if (document.querySelector('script[src="'+src+'"]')) return;
+      return new Promise(function(res, rej) {
+        var s = document.createElement('script');
+        s.src = src; s.onload = res; s.onerror = rej;
+        document.head.appendChild(s);
+      });
+    }
+    await loadScript('https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js');
+    await loadScript('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js');
 
-  var artRows = artikelregels.map(function(r){
-    var a=parseFloat(r.aantal)||0; var p=parseFloat(String(r.prijs||0).replace(',','.'))||0;
-    var lijn=(a*p).toLocaleString('nl-BE',{minimumFractionDigits:2,maximumFractionDigits:2});
-    return '<tr><td>'+e(r.artnr||'-')+'</td><td>'+e(r.naam||'-')+'</td>'
-      +'<td style="text-align:center">'+e(r.uom||'ST')+'</td>'
-      +'<td style="text-align:right">'+a+'</td>'
-      +'<td style="text-align:right">€ '+p.toLocaleString('nl-BE',{minimumFractionDigits:2,maximumFractionDigits:2})+'</td>'
-      +'<td style="text-align:right">€ '+lijn+'</td></tr>';
-  }).join('');
+    // 2. Bouw retourkaart HTML (zonder toolbar, klaar voor render)
+    function e(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+    var artikelregels = [];
+    try { artikelregels = JSON.parse(k.Artikelregels || '[]').filter(function(r){ return r.artnr || r.naam; }); } catch(ex){}
+    var totaal   = artikelregels.reduce(function(s,r){ return s+(parseFloat(r.aantal)||0)*(parseFloat(r.prijs)||0);},0);
+    var fmtTot   = totaal.toLocaleString('nl-BE',{minimumFractionDigits:2,maximumFractionDigits:2});
+    var qrSrc    = 'https://api.qrserver.com/v1/create-qr-code/?size=120x120&data='+encodeURIComponent('https://verpa-klachten.pages.dev/?dossier='+encodeURIComponent(k.Dossiernummer));
+    var datumFmt = k.DatumMelding ? new Date(k.DatumMelding).toLocaleDateString('nl-BE') : '-';
+    var artRows  = artikelregels.map(function(r){
+      var a=parseFloat(r.aantal)||0; var p=parseFloat(String(r.prijs||0).replace(',','.'))||0;
+      var lijn=(a*p).toLocaleString('nl-BE',{minimumFractionDigits:2,maximumFractionDigits:2});
+      return '<tr><td>'+e(r.artnr||'-')+'</td><td>'+e(r.naam||'-')+'</td>'
+        +'<td style="text-align:center">'+e(r.uom||'ST')+'</td>'
+        +'<td style="text-align:right">'+a+'</td>'
+        +'<td style="text-align:right">€ '+p.toLocaleString('nl-BE',{minimumFractionDigits:2,maximumFractionDigits:2})+'</td>'
+        +'<td style="text-align:right">€ '+lijn+'</td></tr>';
+    }).join('');
 
-  var html = '<!DOCTYPE html><html lang="nl"><head><meta charset="UTF-8"/>'
-    +'<title>Retourkaart '+e(k.Dossiernummer)+'</title><style>'
-    +'*{box-sizing:border-box;margin:0;padding:0}'
-    +'body{font-family:Helvetica Neue,Arial,sans-serif;font-size:12px;color:#111;background:#fff;padding:28px 32px}'
-    +'.toolbar{position:fixed;top:0;left:0;right:0;background:#1B3F6A;color:#fff;padding:10px 20px;display:flex;align-items:center;gap:10px;z-index:9999;font-size:13px}'
-    +'.spacer{height:52px}'
-    +'.header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:24px;padding-bottom:16px;border-bottom:2px solid #1B3F6A}'
-    +'.dossier-badge{background:#1B3F6A;color:#fff;font-size:15px;font-weight:700;padding:6px 14px;border-radius:6px}'
-    +'.section{margin-bottom:20px}'
-    +'.section-title{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:#94A3B8;margin-bottom:8px}'
-    +'.info-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px 24px}'
-    +'.info-item label{font-size:9px;text-transform:uppercase;letter-spacing:.07em;color:#94A3B8;display:block;margin-bottom:2px}'
-    +'.info-item span{font-size:13px;font-weight:600;color:#0F172A}'
-    +'table{width:100%;border-collapse:collapse;font-size:11.5px}'
-    +'thead tr{background:#1B3F6A;color:#fff}'
-    +'thead th{padding:7px 10px;text-align:left;font-weight:700;font-size:10px;text-transform:uppercase}'
-    +'tbody tr:nth-child(even){background:#F8FAFC}'
-    +'tbody td{padding:6px 10px;border-bottom:1px solid #E2E8F0}'
-    +'.totaal-row td{font-weight:700;font-size:13px;border-top:2px solid #1B3F6A;border-bottom:none;padding-top:8px}'
-    +'.bottom{display:flex;gap:24px;margin-top:24px;padding-top:16px;border-top:1px solid #E2E8F0}'
-    +'.sign-box{flex:1;border:1.5px dashed #CBD5E1;border-radius:8px;padding:12px 16px;min-height:100px}'
-    +'.sign-label{font-size:9px;text-transform:uppercase;letter-spacing:.08em;color:#94A3B8;font-weight:700;margin-bottom:4px}'
-    +'.sign-name{font-size:11px;color:#64748B;margin-top:6px}'
-    +'.qr-box{display:flex;flex-direction:column;align-items:center;gap:6px}'
-    +'.qr-box img{width:110px;height:110px}'
-    +'.qr-label{font-size:9px;color:#94A3B8;text-align:center;max-width:110px;line-height:1.4}'
-    +'.footer{margin-top:20px;font-size:9px;color:#94A3B8;text-align:center;border-top:1px solid #E2E8F0;padding-top:10px}'
-    +'@media print{.toolbar,.spacer{display:none!important}body{padding:0}@page{margin:12mm;size:A4}}'
-    +'</style></head><body>'
-    // Toolbar (verdwijnt bij printen)
-    +'<div class="toolbar">'
-    +'<span style="flex:1;font-weight:700">'+e(k.Dossiernummer)+' – Kies "Opslaan als PDF" als printer</span>'
-    +'<button onclick="window.print()" style="background:#fff;color:#1B3F6A;border:none;border-radius:6px;padding:7px 16px;font-size:13px;font-weight:700;cursor:pointer">&#128424; Opslaan als PDF</button>'
-    +'<button onclick="window.close()" style="background:transparent;color:#fff;border:1.5px solid rgba(255,255,255,.5);border-radius:6px;padding:7px 14px;font-size:13px;cursor:pointer">Sluiten</button>'
-    +'</div><div class="spacer"></div>'
-    // Retourkaart inhoud
-    +'<div class="header">'
-    +'<div><div style="background:#1B3F6A;border-radius:8px;padding:8px 16px;display:inline-block;margin-bottom:6px">'
-    +'<img src="https://verpa.be/wp-content/uploads/2023/03/cropped-Transparant-logo-Verpa_Lukas-1-2048x594.png" alt="Verpa" style="height:36px;display:block"/>'
-    +'</div><div style="font-size:11px;color:#64748B;margin-top:2px">Verkoop Retour Verzending</div></div>'
-    +'<div style="text-align:right"><div class="dossier-badge">'+e(k.Dossiernummer)+'</div>'
-    +'<div style="font-size:10px;color:#64748B;margin-top:6px">Opgemaakt op '+new Date().toLocaleDateString('nl-BE')+'</div></div>'
-    +'</div>'
-    +'<div class="section" style="display:flex;gap:24px"><div style="flex:1">'
-    +'<div class="section-title">Klantgegevens</div>'
-    +'<div class="info-grid">'
-    +'<div class="info-item"><label>Klantnaam</label><span>'+e(k.Klantnaam)+'</span></div>'
-    +'<div class="info-item"><label>Klantnummer</label><span>'+e(k.Klantnummer)+'</span></div>'
-    +'<div class="info-item"><label>Factuurnummer</label><span>'+e(k.Factuurnummer)+'</span></div>'
-    +'<div class="info-item"><label>Datum melding</label><span>'+datumFmt+'</span></div>'
-    +'<div class="info-item"><label>Type klacht</label><span>'+e(k.TypeKlacht)+'</span></div>'
-    +'<div class="info-item"><label>Ingediend door</label><span>'+e(k.MelderNaam||k.Melder)+'</span></div>'
-    +'</div></div>'
-    +(k.Straat?'<div style="min-width:160px;background:#F8FAFC;border:1px solid #E2E8F0;border-radius:8px;padding:14px 16px">'
-    +'<div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:#94A3B8;margin-bottom:8px">Retouradres</div>'
-    +'<div style="font-size:13px;font-weight:600;line-height:1.7;color:#0F172A">'+e(k.Klantnaam)+'<br>'+e(k.Straat)+'<br>'+e((k.Postcode||'')+' '+(k.Gemeente||'')).trim()+'<br>Belgi&euml;</div>'
-    +'</div>':'')
-    +'</div>'
-    +'<div class="section"><div class="section-title">Te retourneren artikelen</div>'
-    +'<table><thead><tr><th>Artikelnr.</th><th>Artikelnaam</th><th style="text-align:center">UOM</th>'
-    +'<th style="text-align:right">Aantal</th><th style="text-align:right">Prijs/st.</th><th style="text-align:right">Totaal</th></tr></thead>'
-    +'<tbody>'+artRows
-    +'<tr class="totaal-row"><td colspan="5" style="text-align:right">Totaal (excl. BTW)</td>'
-    +'<td style="text-align:right">€ '+fmtTot+'</td></tr>'
-    +'</tbody></table></div>'
-    +'<div class="bottom">'
-    +'<div class="sign-box" style="flex:2"><div class="sign-label">Handtekening klant voor ontvangst retour</div>'
-    +'<div style="height:60px"></div>'
-    +'<div class="sign-name">Naam: _____________________________ &nbsp;&nbsp; Datum: _______________</div></div>'
-    +'<div class="sign-box" style="flex:1.2"><div class="sign-label">Handtekening chauffeur</div>'
-    +'<div style="height:60px"></div>'
-    +'<div class="sign-name">Naam: _____________________________</div></div>'
-    +'<div class="qr-box"><img src="'+qrSrc+'" alt="QR"/>'
-    +'<div class="qr-label">Scan voor digitaal dossier '+e(k.Dossiernummer)+'</div></div>'
-    +'</div>'
-    +'<div class="footer">Verpa Benelux NV &nbsp;&middot;&nbsp; www.verpa.be &nbsp;&middot;&nbsp; Dossier '+e(k.Dossiernummer)+'</div>'
-    +'</body></html>';
+    // 3. Render in verborgen div (zichtbaar voor html2canvas)
+    var wrap = document.createElement('div');
+    wrap.style.cssText = 'position:fixed;left:-9999px;top:0;width:794px;background:#fff;z-index:-1;font-family:Helvetica Neue,Arial,sans-serif;font-size:12px;color:#111;padding:28px 32px;box-sizing:border-box';
+    wrap.innerHTML =
+      '<style>*{box-sizing:border-box;margin:0;padding:0}'
+      +'.hd{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:24px;padding-bottom:16px;border-bottom:2px solid #1B3F6A}'
+      +'.badge{background:#1B3F6A;color:#fff;font-size:15px;font-weight:700;padding:6px 14px;border-radius:6px;display:inline-block}'
+      +'.stitle{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:#94A3B8;margin-bottom:8px}'
+      +'.igrid{display:grid;grid-template-columns:1fr 1fr;gap:10px 24px}'
+      +'.iitem label{font-size:9px;text-transform:uppercase;letter-spacing:.07em;color:#94A3B8;display:block;margin-bottom:2px}'
+      +'.iitem span{font-size:13px;font-weight:600;color:#0F172A}'
+      +'table{width:100%;border-collapse:collapse;font-size:11.5px}'
+      +'thead tr{background:#1B3F6A;color:#fff}'
+      +'thead th{padding:7px 10px;text-align:left;font-weight:700;font-size:10px;text-transform:uppercase}'
+      +'tbody tr:nth-child(even){background:#F8FAFC}'
+      +'tbody td{padding:6px 10px;border-bottom:1px solid #E2E8F0}'
+      +'.trow td{font-weight:700;font-size:13px;border-top:2px solid #1B3F6A;border-bottom:none;padding-top:8px}'
+      +'.bot{display:flex;gap:24px;margin-top:24px;padding-top:16px;border-top:1px solid #E2E8F0}'
+      +'.sbox{flex:1;border:1.5px dashed #CBD5E1;border-radius:8px;padding:12px 16px;min-height:100px}'
+      +'.slbl{font-size:9px;text-transform:uppercase;letter-spacing:.08em;color:#94A3B8;font-weight:700;margin-bottom:4px}'
+      +'.snam{font-size:11px;color:#64748B;margin-top:6px}'
+      +'.qrb{display:flex;flex-direction:column;align-items:center;gap:6px}'
+      +'.qrb img{width:110px;height:110px}'
+      +'.qrl{font-size:9px;color:#94A3B8;text-align:center;max-width:110px;line-height:1.4}'
+      +'.ft{margin-top:20px;font-size:9px;color:#94A3B8;text-align:center;border-top:1px solid #E2E8F0;padding-top:10px}'
+      +'</style>'
+      // Header
+      +'<div class="hd">'
+      +'<div><div style="background:#1B3F6A;border-radius:8px;padding:8px 16px;display:inline-block;margin-bottom:6px">'
+      +'<img src="https://verpa.be/wp-content/uploads/2023/03/cropped-Transparant-logo-Verpa_Lukas-1-2048x594.png" alt="Verpa" style="height:36px;display:block" crossorigin="anonymous"/>'
+      +'</div><div style="font-size:11px;color:#64748B;margin-top:2px">Verkoop Retour Verzending</div></div>'
+      +'<div style="text-align:right"><div class="badge">'+e(k.Dossiernummer)+'</div>'
+      +'<div style="font-size:10px;color:#64748B;margin-top:6px">Opgemaakt op '+new Date().toLocaleDateString('nl-BE')+'</div></div>'
+      +'</div>'
+      // Klantgegevens
+      +'<div style="margin-bottom:20px;display:flex;gap:24px"><div style="flex:1">'
+      +'<div class="stitle">Klantgegevens</div><div class="igrid">'
+      +'<div class="iitem"><label>Klantnaam</label><span>'+e(k.Klantnaam)+'</span></div>'
+      +'<div class="iitem"><label>Klantnummer</label><span>'+e(k.Klantnummer)+'</span></div>'
+      +'<div class="iitem"><label>Factuurnummer</label><span>'+e(k.Factuurnummer)+'</span></div>'
+      +'<div class="iitem"><label>Datum melding</label><span>'+datumFmt+'</span></div>'
+      +'<div class="iitem"><label>Type klacht</label><span>'+e(k.TypeKlacht)+'</span></div>'
+      +'<div class="iitem"><label>Ingediend door</label><span>'+e(k.MelderNaam||k.Melder)+'</span></div>'
+      +'</div></div></div>'
+      // Artikelen
+      +'<div style="margin-bottom:20px"><div class="stitle">Te retourneren artikelen</div>'
+      +'<table><thead><tr><th>Artikelnr.</th><th>Artikelnaam</th><th style="text-align:center">UOM</th>'
+      +'<th style="text-align:right">Aantal</th><th style="text-align:right">Prijs/st.</th><th style="text-align:right">Totaal</th></tr></thead>'
+      +'<tbody>'+artRows+'<tr class="trow"><td colspan="5" style="text-align:right">Totaal (excl. BTW)</td>'
+      +'<td style="text-align:right">€ '+fmtTot+'</td></tr></tbody></table></div>'
+      // Handtekeningen + QR
+      +'<div class="bot">'
+      +'<div class="sbox" style="flex:2"><div class="slbl">Handtekening klant voor ontvangst retour</div>'
+      +'<div style="height:60px"></div>'
+      +'<div class="snam">Naam: _________________________ &nbsp; Datum: _____________</div></div>'
+      +'<div class="sbox" style="flex:1.2"><div class="slbl">Handtekening chauffeur</div>'
+      +'<div style="height:60px"></div>'
+      +'<div class="snam">Naam: _________________________</div></div>'
+      +'<div class="qrb"><img src="'+qrSrc+'" alt="QR" crossorigin="anonymous"/>'
+      +'<div class="qrl">Scan voor dossier '+e(k.Dossiernummer)+'</div></div>'
+      +'</div>'
+      +'<div class="ft">Verpa Benelux NV &nbsp;&middot;&nbsp; www.verpa.be &nbsp;&middot;&nbsp; Dossier '+e(k.Dossiernummer)+'</div>';
 
-  var win = window.open('', '_blank');
-  if (!win) { showToast('Sta pop-ups toe om de PDF te genereren.', 'error'); return; }
-  win.document.open();
-  win.document.write(html);
-  win.document.close();
+    document.body.appendChild(wrap);
+
+    // Wacht even zodat afbeeldingen geladen zijn
+    await new Promise(function(r){ setTimeout(r, 800); });
+
+    // 4. html2canvas → jsPDF
+    var canvas = await html2canvas(wrap, {
+      scale: 2,
+      useCORS: true,
+      allowTaint: false,
+      backgroundColor: '#ffffff',
+      width: 794,
+      windowWidth: 794,
+    });
+
+    document.body.removeChild(wrap);
+
+    var imgData = canvas.toDataURL('image/jpeg', 0.95);
+    var { jsPDF } = window.jspdf;
+    var pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+    var pdfW = pdf.internal.pageSize.getWidth();
+    var pdfH = (canvas.height * pdfW) / canvas.width;
+    pdf.addImage(imgData, 'JPEG', 0, 0, pdfW, pdfH);
+    pdf.save('Retourkaart_' + k.Dossiernummer + '.pdf');
+
+    showToast('PDF gedownload.', 'success');
+
+  } catch(err) {
+    console.error('PDF fout:', err);
+    showToast('PDF genereren mislukt: ' + err.message, 'error');
+  } finally {
+    if (btn) { btn.disabled = false; btn.innerHTML = origHtml; }
+  }
 }
