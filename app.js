@@ -2212,7 +2212,7 @@ function buildRetourHtml(k) {
   <div class="header">
     <div class="header-left">
       <div style="background:#1B3F6A;border-radius:8px;padding:8px 16px;display:inline-block;margin-bottom:6px">
-        <img src="https://verpa.be/wp-content/uploads/2023/03/cropped-Transparant-logo-Verpa_Lukas-1-2048x594.png" alt="Verpa" style="height:36px;display:block" />
+        <img src="https://verpa.be/wp-content/uploads/2023/03/cropped-Transparant-logo-Verpa_Lukas-1-2048x594.png" alt="Verpa" style="height:36px;display:block" crossorigin="anonymous" onerror="this.onerror=null;this.src='data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22200%22%20height%3D%2246%22%20viewBox%3D%220%200%20200%2046%22%3E%3Crect%20width%3D%22200%22%20height%3D%2246%22%20rx%3D%226%22%20fill%3D%22%231B3F6A%22%2F%3E%3Ctext%20x%3D%2216%22%20y%3D%2233%22%20font-family%3D%22Helvetica%20Neue%2CAriel%2Csans-serif%22%20font-size%3D%2226%22%20font-weight%3D%22800%22%20fill%3D%22%23ffffff%22%20letter-spacing%3D%224%22%3EVERPA%3C%2Ftext%3E%3C%2Fsvg%3E'"/>
       </div>
       <div class="sub">Verkoop Retour Verzending</div>
     </div>
@@ -2545,7 +2545,7 @@ function printRetour(itemId) {
   <div class="header">
     <div class="header-left">
       <div style="background:#1B3F6A;border-radius:8px;padding:8px 16px;display:inline-block;margin-bottom:6px">
-        <img src="https://verpa.be/wp-content/uploads/2023/03/cropped-Transparant-logo-Verpa_Lukas-1-2048x594.png" alt="Verpa" style="height:36px;display:block" />
+        <img src="https://verpa.be/wp-content/uploads/2023/03/cropped-Transparant-logo-Verpa_Lukas-1-2048x594.png" alt="Verpa" style="height:36px;display:block" crossorigin="anonymous" onerror="this.onerror=null;this.src='data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22200%22%20height%3D%2246%22%20viewBox%3D%220%200%20200%2046%22%3E%3Crect%20width%3D%22200%22%20height%3D%2246%22%20rx%3D%226%22%20fill%3D%22%231B3F6A%22%2F%3E%3Ctext%20x%3D%2216%22%20y%3D%2233%22%20font-family%3D%22Helvetica%20Neue%2CAriel%2Csans-serif%22%20font-size%3D%2226%22%20font-weight%3D%22800%22%20fill%3D%22%23ffffff%22%20letter-spacing%3D%224%22%3EVERPA%3C%2Ftext%3E%3C%2Fsvg%3E'"/>
       </div>
       <div class="sub">Verkoop Retour Verzending</div>
     </div>
@@ -2683,21 +2683,8 @@ async function downloadRetourPdf(itemId) {
     await loadScript('https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js');
     await loadScript('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js');
 
-    // 2. Haal logo op als base64 data URL (vanuit de browser, geen CORS probleem)
-    var logoDataUrl = await fetch('https://verpa.be/wp-content/uploads/2023/03/cropped-Transparant-logo-Verpa_Lukas-1-2048x594.png')
-      .then(function(r){ return r.blob(); })
-      .then(function(blob){ return new Promise(function(res){ var fr=new FileReader();fr.onload=function(e){res(e.target.result);};fr.readAsDataURL(blob); }); })
-      .catch(function(){ return null; });
-
-    // 3. Gebruik buildRetourHtml maar vervang logo src door data URL
+    // 2. Gebruik buildRetourHtml (logo heeft onerror fallback naar SVG)
     var html = buildRetourHtml(k);
-    if (logoDataUrl) {
-      html = html.replace(
-        'https://verpa.be/wp-content/uploads/2023/03/cropped-Transparant-logo-Verpa_Lukas-1-2048x594.png',
-        logoDataUrl
-      );
-    }
-    // Verwijder auto-print script en style tag wrapper
     html = html.replace('<script>window.onload = function(){ window.print(); }<\/script>', '');
 
     // 4. Render in verborgen iframe (betrouwbaarder dan div voor complexe CSS)
