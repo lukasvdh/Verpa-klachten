@@ -2691,62 +2691,67 @@ async function downloadRetourPdf(itemId) {
     // 1. Laad bibliotheken
     async function loadScript(src) {
       if (document.querySelector('script[src="'+src+'"]')) return;
-      return new Promise(function(res,rej){ var s=document.createElement('script');s.src=src;s.onload=res;s.onerror=rej;document.head.appendChild(s); });
+      return new Promise(function(res,rej){
+        var s = document.createElement('script');
+        s.src = src; s.onload = res; s.onerror = rej;
+        document.head.appendChild(s);
+      });
     }
     await loadScript('https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js');
     await loadScript('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js');
 
-    // 2. Bouw HTML en vervang logo door base64 zodat html2canvas het altijd toont
-    var html = buildRetourHtml(k);
-    html = html.replace('<script>window.onload = function(){ window.print(); }<\/script>', '');
-    // Wacht max 2s op logo base64, anders doorgaan zonder
+    // 2. Zorg voor logo base64
     if (!VERPA_LOGO_B64) {
-      await new Promise(function(res){
-        var waited = 0;
-        var t = setInterval(function(){
-          waited += 100;
-          if (VERPA_LOGO_B64 || waited >= 2000) { clearInterval(t); res(); }
-        }, 100);
-      });
-    }
-    if (VERPA_LOGO_B64) {
-      html = html.split(VERPA_LOGO_URL).join(VERPA_LOGO_B64);
-    } else {
-      // Fallback: laad logo opnieuw zonder crossOrigin restrictie
       try {
-        var logoBlob = await fetch(VERPA_LOGO_URL).then(function(r){ return r.blob(); });
+        var blob = await fetch(VERPA_LOGO_URL).then(function(r){ return r.blob(); });
         VERPA_LOGO_B64 = await new Promise(function(res){
-          var fr = new FileReader();
-          fr.onload = function(e){ res(e.target.result); };
-          fr.readAsDataURL(logoBlob);
+          var fr = new FileReader(); fr.onload = function(e){ res(e.target.result); }; fr.readAsDataURL(blob);
         });
-        html = html.split(VERPA_LOGO_URL).join(VERPA_LOGO_B64);
       } catch(e) { console.warn('Logo fetch mislukt:', e.message); }
     }
 
-    // 4. Render via verborgen iframe op exacte A4-breedte
-    var iframe = document.createElement('iframe');
-    iframe.style.cssText = 'position:fixed;left:-9999px;top:0;width:794px;height:1px;border:none;visibility:visible;opacity:0;pointer-events:none';
-    document.body.appendChild(iframe);
+    // 3. Bouw retourkaart HTML en vervang logo URL door base64
+    var html = buildRetourHtml(k);
+    html = html.replace('<script>window.onload = function(){ window.print(); }<\/script>', '');
+    if (VERPA_LOGO_B64) {
+      html = html.split(VERPA_LOGO_URL).join(VERPA_LOGO_B64);
+    }
 
-    await new Promise(function(res) {
-      iframe.onload = res;
-      iframe.srcdoc = html;
-    });
+    // 4. Render in verborgen div (geen iframe - betrouwbaarder)
+    // Extraheer <style> en body-inhoud
+    var styles = '';
+    html.replace(/<style[^>]*>([\s\S]*?)<\/style>/gi, function(_, css){ styles += css; return ''; });
+    var bodyHtml = html.replace(/[\s\S]*<body[^>]*>/i,'').replace(/<\/body>[\s\S]*/i,'');
 
-    // Wacht op render + afbeeldingen (background-image heeft geen load event)
-    await new Promise(function(r){ setTimeout(r, 1500); });
+    var wrap = document.createElement('div');
+    wrap.style.cssText = [
+      'position:fixed','left:-9999px','top:0',
+      'width:794px','min-height:1px',
+      'background:#fff','z-index:99999',
+      'font-family:Helvetica Neue,Arial,sans-serif',
+      'font-size:12px','color:#111',
+      'padding:28px 32px','box-sizing:border-box'
+    ].join(';');
 
-    var iframeDoc = iframe.contentDocument || iframe.contentWindow.document;
-    var iframeBody = iframeDoc.body;
-    iframeBody.style.margin = '0';
-    iframeBody.style.padding = '28px 32px';
-    iframeBody.style.boxSizing = 'border-box';
+    // Voeg styles toe
+    var styleEl = document.createElement('style');
+    styleEl.textContent = styles;
+    wrap.appendChild(styleEl);
 
-    // 5. html2canvas op iframe body
-    var canvas = await html2canvas(iframeBody, {
+    // Voeg body content toe
+    var bodyDiv = document.createElement('div');
+    bodyDiv.innerHTML = bodyHtml;
+    wrap.appendChild(bodyDiv);
+
+    document.body.appendChild(wrap);
+
+    // Wacht op render en afbeeldingen
+    await new Promise(function(r){ setTimeout(r, 800); });
+
+    // 5. html2canvas
+    var canvas = await html2canvas(wrap, {
       scale: 2,
-      useCORS: false,
+      useCORS: true,
       allowTaint: true,
       backgroundColor: '#ffffff',
       width: 794,
@@ -2754,33 +2759,32 @@ async function downloadRetourPdf(itemId) {
       logging: false,
     });
 
-    document.body.removeChild(iframe);
+    document.body.removeChild(wrap);
 
-    // 6. canvas → PDF
-    var imgData = canvas.toDataURL('image/jpeg', 0.97);
+    // 6. canvas → A4 PDF
+    var imgData = canvas.toDataURL('image/jpeg', 0.95);
     var jsPDFLib = window.jspdf.jsPDF;
     var pdf = new jsPDFLib({ orientation: 'portrait', unit: 'mm', format: 'a4' });
     var pdfW = pdf.internal.pageSize.getWidth();
-    var pdfH = (canvas.height * pdfW) / canvas.width;
+    var pdfH = pdf.internal.pageSize.getHeight();
+    var imgH = (canvas.height * pdfW) / canvas.width;
 
-    // Meerdere pagina's indien nodig
-    var pageH = pdf.internal.pageSize.getHeight();
-    if (pdfH <= pageH) {
-      pdf.addImage(imgData, 'JPEG', 0, 0, pdfW, pdfH);
+    if (imgH <= pdfH) {
+      pdf.addImage(imgData, 'JPEG', 0, 0, pdfW, imgH);
     } else {
+      // Meerdere pagina's
       var pageCanvas = document.createElement('canvas');
-      var pageHeightPx = Math.round(canvas.width * pageH / pdfW);
+      var pageHeightPx = Math.round(canvas.width * pdfH / pdfW);
       pageCanvas.width = canvas.width;
       pageCanvas.height = pageHeightPx;
       var ctx = pageCanvas.getContext('2d');
-      var pagesCount = Math.ceil(canvas.height / pageHeightPx);
-      for (var page = 0; page < pagesCount; page++) {
+      var pages = Math.ceil(canvas.height / pageHeightPx);
+      for (var p = 0; p < pages; p++) {
         ctx.fillStyle = '#fff';
-        ctx.fillRect(0, 0, pageCanvas.width, pageCanvas.height);
-        ctx.drawImage(canvas, 0, -page * pageHeightPx);
-        var pageData = pageCanvas.toDataURL('image/jpeg', 0.97);
-        if (page > 0) pdf.addPage();
-        pdf.addImage(pageData, 'JPEG', 0, 0, pdfW, pageH);
+        ctx.fillRect(0, 0, pageCanvas.width, pageHeightPx);
+        ctx.drawImage(canvas, 0, -p * pageHeightPx);
+        if (p > 0) pdf.addPage();
+        pdf.addImage(pageCanvas.toDataURL('image/jpeg', 0.95), 'JPEG', 0, 0, pdfW, pdfH);
       }
     }
 
