@@ -2154,6 +2154,29 @@ function gesprekInvoerSetup() {
    Gedeelde helper: genereert dezelfde HTML als printRetour()
    maar zonder window.open – zodat we hem als bijlage kunnen sturen.
    ════════════════════════════════════════════════════════════ */
+// Cache voor logo base64 - wordt gevuld bij eerste gebruik
+var _logoBase64Cache = null;
+
+async function getLogoBase64() {
+  if (_logoBase64Cache) return _logoBase64Cache;
+  try {
+    // Probeer logo te laden via een canvas (werkt als het al in browsercache zit)
+    var img = new Image();
+    img.crossOrigin = 'anonymous';
+    await new Promise(function(res, rej) {
+      img.onload = res; img.onerror = rej;
+      img.src = 'https://verpa.be/wp-content/uploads/2023/03/cropped-Transparant-logo-Verpa_Lukas-1-2048x594.png';
+    });
+    var c = document.createElement('canvas');
+    c.width = img.naturalWidth; c.height = img.naturalHeight;
+    c.getContext('2d').drawImage(img, 0, 0);
+    _logoBase64Cache = c.toDataURL('image/png');
+    return _logoBase64Cache;
+  } catch(e) {
+    return null;
+  }
+}
+
 function buildRetourHtml(k) {
   var artikelregels = [];
   try { artikelregels = JSON.parse(k.Artikelregels || '[]').filter(function(r){ return r.artnr || r.naam; }); } catch(e){}
@@ -2683,9 +2706,13 @@ async function downloadRetourPdf(itemId) {
     await loadScript('https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js');
     await loadScript('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js');
 
-    // 2. Gebruik buildRetourHtml (logo heeft onerror fallback naar SVG)
+    // 2. Bouw HTML en vervang logo door gecachte base64 (vermijdt CORS in html2canvas)
+    var logoB64 = await getLogoBase64();
     var html = buildRetourHtml(k);
     html = html.replace('<script>window.onload = function(){ window.print(); }<\/script>', '');
+    if (logoB64) {
+      html = html.split('https://verpa.be/wp-content/uploads/2023/03/cropped-Transparant-logo-Verpa_Lukas-1-2048x594.png').join(logoB64);
+    }
 
     // 4. Render in verborgen iframe (betrouwbaarder dan div voor complexe CSS)
     var iframe = document.createElement('iframe');
