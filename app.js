@@ -2735,7 +2735,7 @@ async function downloadRetourPdf(itemId) {
       // Header
       +'<div class="hd">'
       +'<div><div style="background:#1B3F6A;border-radius:8px;padding:8px 16px;display:inline-block;margin-bottom:6px">'
-      +'<img src="https://verpa.be/wp-content/uploads/2023/03/cropped-Transparant-logo-Verpa_Lukas-1-2048x594.png" alt="Verpa" style="height:36px;display:block" crossorigin="anonymous"/>'
+      +'<svg xmlns="http://www.w3.org/2000/svg" width="160" height="36" viewBox="0 0 160 36">'+'<rect width="160" height="36" rx="4" fill="#1B3F6A"/>'+'<text x="12" y="26" font-family="Helvetica Neue,Arial,sans-serif" font-size="22" font-weight="800" fill="#ffffff" letter-spacing="3">VERPA</text>'+'</svg>'
       +'</div><div style="font-size:11px;color:#64748B;margin-top:2px">Verkoop Retour Verzending</div></div>'
       +'<div style="text-align:right"><div class="badge">'+e(k.Dossiernummer)+'</div>'
       +'<div style="font-size:10px;color:#64748B;margin-top:6px">Opgemaakt op '+new Date().toLocaleDateString('nl-BE')+'</div></div>'
