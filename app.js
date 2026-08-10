@@ -2748,7 +2748,15 @@ async function downloadRetourPdf(itemId) {
       +'<div class="iitem"><label>Datum melding</label><span>'+datumFmt+'</span></div>'
       +'<div class="iitem"><label>Type klacht</label><span>'+e(k.TypeKlacht)+'</span></div>'
       +'<div class="iitem"><label>Ingediend door</label><span>'+e(k.MelderNaam||k.Melder)+'</span></div>'
-      +'</div></div></div>'
+      +'</div></div>'
+      +(k.Straat||k.straat ? '<div style="min-width:160px;background:#F8FAFC;border:1px solid #E2E8F0;border-radius:8px;padding:14px 16px">'
+        +'<div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:#94A3B8;margin-bottom:8px">Retouradres klant</div>'
+        +'<div style="font-size:13px;font-weight:600;line-height:1.7;color:#0F172A">'
+        +e(k.Klantnaam)+'<br>'
+        +e(k.Straat||k.straat||'')+'<br>'
+        +e(((k.Postcode||k.postcode||'')+' '+(k.Gemeente||k.gemeente||'')).trim())+'<br>Belgi&euml;'
+        +'</div></div>' : '')
+      +'</div>'
       // Artikelen
       +'<div style="margin-bottom:20px"><div class="stitle">Te retourneren artikelen</div>'
       +'<table><thead><tr><th>Artikelnr.</th><th>Artikelnaam</th><th style="text-align:center">UOM</th>'
