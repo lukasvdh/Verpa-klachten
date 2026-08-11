@@ -2528,7 +2528,116 @@ function _retourOpenVenster(itemId, autoPrint) {
 function previewRetour(itemId) { _retourOpenVenster(itemId, false); }
 function printRetour(itemId)   { _retourOpenVenster(itemId, true);  }
 
-function downloadRetourPdf(itemId) {
-  // Gebruik exact dezelfde flow als printRetour maar met auto-print voor PDF opslaan
-  _retourOpenVenster(itemId, true);
+async function downloadRetourPdf(itemId) {
+  var k = allKlachten.find(function(x){ return x.id === itemId; });
+  if (!k) return;
+
+  var btn = document.activeElement;
+  var origHtml = btn ? btn.innerHTML : '';
+  if (btn) { btn.disabled = true; btn.innerHTML = 'Laden&#8230;'; }
+
+  try {
+    // Bouw de retourkaart HTML (zelfde als printversie)
+    var html = buildRetourHtml(k);
+    html = html.replace('<script>window.onload = function(){ window.print(); }<\/script>', '');
+
+    // Maak een Blob URL - geen CORS restricties want zelfde origin
+    var blob = new Blob([html], { type: 'text/html;charset=utf-8' });
+    var blobUrl = URL.createObjectURL(blob);
+
+    // Laad de HTML in een verborgen iframe via de blob URL
+    var iframe = document.createElement('iframe');
+    iframe.style.cssText = 'position:fixed;top:0;left:0;width:794px;height:1123px;border:none;opacity:0;pointer-events:none;z-index:-1';
+    document.body.appendChild(iframe);
+    iframe.src = blobUrl;
+
+    // Wacht tot iframe geladen is
+    await new Promise(function(res){ iframe.onload = res; });
+    await new Promise(function(r){ setTimeout(r, 1000); });
+
+    // Laad html2canvas en jsPDF
+    async function loadScript(src) {
+      if (document.querySelector('script[src="'+src+'"]')) return;
+      return new Promise(function(res,rej){
+        var s=document.createElement('script'); s.src=src; s.onload=res; s.onerror=rej; document.head.appendChild(s);
+      });
+    }
+    await loadScript('https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js');
+    await loadScript('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js');
+
+    // Render iframe inhoud
+    var iDoc = iframe.contentDocument || iframe.contentWindow.document;
+    var iBody = iDoc.body;
+    iBody.style.margin = '0';
+    iBody.style.padding = '28px 32px';
+    iBody.style.boxSizing = 'border-box';
+    iBody.style.width = '794px';
+
+    // Injecteer logo als canvas in iframe (blob URL = geen CORS)
+    var logoEl = iDoc.querySelector('#verpa-logo-placeholder');
+    if (logoEl && VERPA_LOGO_B64) {
+      var tmpImg = new Image();
+      tmpImg.src = VERPA_LOGO_B64;
+      await new Promise(function(res){ tmpImg.onload=res; tmpImg.onerror=res; });
+      var lC = iDoc.createElement('canvas');
+      lC.width = tmpImg.naturalWidth;
+      lC.height = tmpImg.naturalHeight;
+      lC.style.cssText = 'display:block;height:36px;width:auto';
+      lC.getContext('2d').drawImage(tmpImg, 0, 0);
+      logoEl.innerHTML = '';
+      logoEl.appendChild(lC);
+    }
+
+    await new Promise(function(r){ setTimeout(r, 300); });
+
+    // html2canvas op iframe body - blob URL = zelfde origin = geen taint
+    var canvas = await html2canvas(iBody, {
+      scale: 2,
+      useCORS: true,
+      allowTaint: false,
+      backgroundColor: '#ffffff',
+      width: 794,
+      windowWidth: 794,
+      logging: false,
+    });
+
+    document.body.removeChild(iframe);
+    URL.revokeObjectURL(blobUrl);
+
+    // Canvas naar PDF
+    var imgData = canvas.toDataURL('image/jpeg', 0.97);
+    var jsPDFLib = window.jspdf.jsPDF;
+    var pdf = new jsPDFLib({ orientation:'portrait', unit:'mm', format:'a4' });
+    var pdfW = pdf.internal.pageSize.getWidth();
+    var pdfH = pdf.internal.pageSize.getHeight();
+    var imgH = (canvas.height * pdfW) / canvas.width;
+
+    if (imgH <= pdfH) {
+      pdf.addImage(imgData,'JPEG',0,0,pdfW,imgH);
+    } else {
+      var pageCanvas = document.createElement('canvas');
+      var pageHpx = Math.round(canvas.width * pdfH / pdfW);
+      pageCanvas.width = canvas.width;
+      pageCanvas.height = pageHpx;
+      var ctx = pageCanvas.getContext('2d');
+      var pages = Math.ceil(canvas.height / pageHpx);
+      for (var p=0; p<pages; p++) {
+        ctx.fillStyle='#fff'; ctx.fillRect(0,0,pageCanvas.width,pageHpx);
+        ctx.drawImage(canvas,0,-p*pageHpx);
+        if (p>0) pdf.addPage();
+        pdf.addImage(pageCanvas.toDataURL('image/jpeg',0.97),'JPEG',0,0,pdfW,pdfH);
+      }
+    }
+
+    pdf.save('Retourkaart_'+k.Dossiernummer+'.pdf');
+    showToast('PDF gedownload.', 'success');
+
+  } catch(err) {
+    console.error('PDF fout:', err);
+    showToast('PDF genereren mislukt: '+err.message, 'error');
+    var ol = document.querySelector('iframe[src^="blob:"]');
+    if (ol && ol.parentNode) ol.parentNode.removeChild(ol);
+  } finally {
+    if(btn){ btn.disabled=false; btn.innerHTML=origHtml; }
+  }
 }
