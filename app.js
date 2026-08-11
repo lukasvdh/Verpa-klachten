@@ -2702,7 +2702,7 @@ async function downloadRetourPdf(itemId) {
     overlay.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(255,255,255,0.95);z-index:99998;display:flex;align-items:flex-start;justify-content:center;overflow:auto';
 
     var wrap = document.createElement('div');
-    wrap.style.cssText = 'width:794px;background:#fff;font-family:Helvetica Neue,Arial,sans-serif;font-size:12px;color:#111;box-sizing:border-box;margin:20px auto';
+    wrap.style.cssText = 'width:794px;background:#fff;font-family:Helvetica Neue,Arial,sans-serif;font-size:12px;color:#111;box-sizing:border-box;margin:0 auto;padding:28px 32px';
 
     var styleEl = document.createElement('style');
     styleEl.textContent = styles;
@@ -2715,47 +2715,44 @@ async function downloadRetourPdf(itemId) {
     overlay.appendChild(wrap);
     document.body.appendChild(overlay);
 
-    // 5. Logo als canvas injecteren (geen CORS probleem)
-    var logoEl = wrap.querySelector('#verpa-logo-placeholder');
-    if (logoEl) {
-      var tmpImg = new Image();
-      tmpImg.src = VERPA_LOGO_B64;
-      await new Promise(function(res){ tmpImg.onload=res; tmpImg.onerror=res; });
-      var lC = document.createElement('canvas');
-      var lH = tmpImg.naturalHeight; var lW = tmpImg.naturalWidth;
-      lC.width=lW; lC.height=lH;
-      lC.getContext('2d').drawImage(tmpImg,0,0);
-      lC.style.cssText = 'display:block;height:36px;width:auto';
-      logoEl.innerHTML = '';
-      logoEl.appendChild(lC);
+    // 5. Logo laden en bewaren als canvas
+    var logoCanvas = null;
+    var tmpImg = new Image();
+    tmpImg.src = VERPA_LOGO_B64;
+    await new Promise(function(res){ tmpImg.onload=res; tmpImg.onerror=res; });
+    logoCanvas = document.createElement('canvas');
+    logoCanvas.width  = tmpImg.naturalWidth;
+    logoCanvas.height = tmpImg.naturalHeight;
+    logoCanvas.getContext('2d').drawImage(tmpImg, 0, 0);
+
+    // Logo injecteren in wrap EN via onclone voor html2canvas clone
+    function injectLogo(root) {
+      var el = root.querySelector('#verpa-logo-placeholder');
+      if (!el || !logoCanvas) return;
+      var c = document.createElement('canvas');
+      c.width  = logoCanvas.width;
+      c.height = logoCanvas.height;
+      c.style.cssText = 'display:block;height:36px;width:auto';
+      c.getContext('2d').drawImage(logoCanvas, 0, 0);
+      el.innerHTML = '';
+      el.appendChild(c);
     }
+    injectLogo(wrap);
 
     // 6. Wacht op render
-    await new Promise(function(r){ setTimeout(r, 600); });
+    await new Promise(function(r){ setTimeout(r, 500); });
 
-    // 7. html2canvas op wrap (zichtbaar element = geen problemen)
+    // 7. html2canvas
     var canvas = await html2canvas(wrap, {
       scale: 2,
-      useCORS: true,
+      useCORS: false,
       allowTaint: true,
       backgroundColor: '#ffffff',
       width: 794,
       windowWidth: 794,
       logging: false,
       onclone: function(clonedDoc) {
-        // Zorg dat logo canvas ook in clone zit
-        var cloneLogoEl = clonedDoc.querySelector('#verpa-logo-placeholder');
-        if (cloneLogoEl && logoEl) {
-          var cloneLc = document.createElement('canvas');
-          var src = logoEl.querySelector('canvas');
-          if (src) {
-            cloneLc.width = src.width; cloneLc.height = src.height;
-            cloneLc.style.cssText = src.style.cssText;
-            cloneLc.getContext('2d').drawImage(src,0,0);
-            cloneLogoEl.innerHTML = '';
-            cloneLogoEl.appendChild(cloneLc);
-          }
-        }
+        injectLogo(clonedDoc);
       }
     });
 
