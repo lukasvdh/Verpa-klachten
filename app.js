@@ -41,7 +41,7 @@ const GRAPH_SCOPES = ['User.Read', 'Sites.ReadWrite.All', 'Mail.Send'];
    Ontvangt een melding bij elk nieuw ingediend ticket.
    ─────────────────────────────────────────────────────────────────────────── */
 const NOTIFICATIE_EMAIL = 'Ils@verpa.be';
-const VERPA_LOGO_URL = 'https://verpa.be/wp-content/uploads/2023/03/cropped-Transparant-logo-Verpa_Lukas-1-2048x594.png';
+const VERPA_LOGO_URL = '/logo.png'; // lokaal bestand op Cloudflare Pages - geen CORS
 const VERPA_LOGO_B64 = 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyMjAgNTAiIHdpZHRoPSIyMjAiIGhlaWdodD0iNTAiPgogIDxyZWN0IHdpZHRoPSIyMjAiIGhlaWdodD0iNTAiIHJ4PSI2IiBmaWxsPSIjMUIzRjZBIi8+CiAgPGNpcmNsZSBjeD0iMjUiIGN5PSIyNSIgcj0iMTgiIGZpbGw9IiNmMzdhMmIiLz4KICA8dGV4dCB4PSIyNSIgeT0iMzIiIGZvbnQtZmFtaWx5PSJBcmlhbCBCbGFjayxBcmlhbCxzYW5zLXNlcmlmIiBmb250LXNpemU9IjIyIiBmb250LXdlaWdodD0iOTAwIiBmaWxsPSJ3aGl0ZSIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZG9taW5hbnQtYmFzZWxpbmU9Im1pZGRsZSI+cDwvdGV4dD4KICA8dGV4dCB4PSIxMjAiIHk9IjI2IiBmb250LWZhbWlseT0iSGVsdmV0aWNhIE5ldWUsQXJpYWwsc2Fucy1zZXJpZiIgZm9udC1zaXplPSIyNCIgZm9udC13ZWlnaHQ9IjgwMCIgZmlsbD0id2hpdGUiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGxldHRlci1zcGFjaW5nPSIzIj5WRVJQQTwvdGV4dD4KPC9zdmc+'; // hardcoded SVG base64 - geen CORS probleem
 const SP_GESPREK_LIST   = 'KlachtenGesprekken'; // SharePoint lijst voor gesprekberichten
 
