@@ -2727,18 +2727,19 @@ async function downloadRetourPdf(itemId) {
     document.body.appendChild(wrap);
 
     // Vervang logo-placeholder door een inline canvas-element
-    // Logo via hardcoded base64 op canvas tekenen (geen externe request, geen CORS)
+    // Logo programmatisch injecteren na innerHTML (src te lang voor HTML-attribuut in string)
     var logoEl = wrap.querySelector('#verpa-logo-placeholder');
     if (logoEl) {
-      var logoImg = new Image();
-      await new Promise(function(res){ logoImg.onload=res; logoImg.onerror=res; logoImg.src=VERPA_LOGO_B64; });
-      var logoCanvas = document.createElement('canvas');
-      logoCanvas.width  = logoImg.naturalWidth  || 400;
-      logoCanvas.height = logoImg.naturalHeight || 116;
-      logoCanvas.getContext('2d').drawImage(logoImg, 0, 0);
-      logoCanvas.style.cssText = 'display:block;height:36px;width:auto';
+      // Maak img element en stel src programmatisch in (geen truncatie via innerHTML)
+      var logoImg = document.createElement('img');
+      logoImg.style.cssText = 'height:36px;display:block';
+      logoImg.alt = 'Verpa';
       logoEl.innerHTML = '';
-      logoEl.appendChild(logoCanvas);
+      logoEl.appendChild(logoImg);
+      // src instellen NA appendChild (browser laadt dan correct)
+      logoImg.src = VERPA_LOGO_B64;
+      // Wacht tot afbeelding geladen is
+      await new Promise(function(res){ logoImg.onload=res; logoImg.onerror=res; });
     }
 
     // Wacht op render
