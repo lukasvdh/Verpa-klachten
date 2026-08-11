@@ -2726,20 +2726,20 @@ async function downloadRetourPdf(itemId) {
 
     document.body.appendChild(wrap);
 
-    // Vervang logo-placeholder door een inline canvas-element
-    // Logo programmatisch injecteren na innerHTML (src te lang voor HTML-attribuut in string)
+    // Logo op canvas tekenen (html2canvas rendert canvas-in-canvas altijd correct)
     var logoEl = wrap.querySelector('#verpa-logo-placeholder');
     if (logoEl) {
-      // Maak img element en stel src programmatisch in (geen truncatie via innerHTML)
-      var logoImg = document.createElement('img');
-      logoImg.style.cssText = 'height:36px;display:block';
-      logoImg.alt = 'Verpa';
+      var tmpImg = new Image();
+      tmpImg.src = VERPA_LOGO_B64;
+      await new Promise(function(res){ tmpImg.onload=res; tmpImg.onerror=res; });
+      var logoCanvas = document.createElement('canvas');
+      var scale = 36 / tmpImg.naturalHeight;
+      logoCanvas.width  = Math.round(tmpImg.naturalWidth  * scale);
+      logoCanvas.height = 36;
+      logoCanvas.style.cssText = 'display:block;height:36px;width:' + logoCanvas.width + 'px';
+      logoCanvas.getContext('2d').drawImage(tmpImg, 0, 0, logoCanvas.width, logoCanvas.height);
       logoEl.innerHTML = '';
-      logoEl.appendChild(logoImg);
-      // src instellen NA appendChild (browser laadt dan correct)
-      logoImg.src = VERPA_LOGO_B64;
-      // Wacht tot afbeelding geladen is
-      await new Promise(function(res){ logoImg.onload=res; logoImg.onerror=res; });
+      logoEl.appendChild(logoCanvas);
     }
 
     // Wacht op render
