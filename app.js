@@ -2669,130 +2669,39 @@ function _retourOpenVenster(itemId, autoPrint) {
 function previewRetour(itemId) { _retourOpenVenster(itemId, false); }
 function printRetour(itemId)   { _retourOpenVenster(itemId, true);  }
 
-async function downloadRetourPdf(itemId) {
+function downloadRetourPdf(itemId) {
   var k = allKlachten.find(function(x){ return x.id === itemId; });
   if (!k) return;
 
-  var btn = document.activeElement;
-  var origHtml = btn ? btn.innerHTML : '';
-  if (btn) { btn.disabled = true; btn.innerHTML = 'Laden&#8230;'; }
+  // Gebruik dezelfde HTML als de printversie - browser print-naar-PDF geeft identieke output
+  var html = buildRetourHtml(k);
 
-  try {
-    // 1. Laad html2canvas + jsPDF
-    async function loadScript(src) {
-      if (document.querySelector('script[src="'+src+'"]')) return;
-      return new Promise(function(res,rej){
-        var s=document.createElement('script'); s.src=src; s.onload=res; s.onerror=rej; document.head.appendChild(s);
-      });
-    }
-    await loadScript('https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js');
-    await loadScript('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js');
+  // Vervang auto-print door een knop + instructie banner
+  html = html
+    .replace('<script>window.onload = function(){ window.print(); }<\/script>',
+      '<script>window.onload = function(){ setTimeout(function(){ window.print(); }, 500); }<\/script>')
+    .replace('</style>',
+      '@media print{' +
+        '.verpa-toolbar{display:none!important}' +
+        'body{padding:12mm!important}' +
+        '@page{size:A4;margin:0}' +
+      '}' +
+      '@media screen{body{padding:80px 32px 32px}}' +
+      '</style>')
+    .replace('<body>',
+      '<body>' +
+      '<div class="verpa-toolbar" style="position:fixed;top:0;left:0;right:0;background:#1B3F6A;color:#fff;' +
+      'padding:10px 20px;display:flex;align-items:center;gap:12px;z-index:9999;font-family:Helvetica Neue,Arial,sans-serif;font-size:13px">' +
+      '<span style="flex:1;font-weight:600">Kies <strong>&quot;Opslaan als PDF&quot;</strong> als printer om de retourkaart te downloaden</span>' +
+      '<button onclick="window.print()" style="background:#fff;color:#1B3F6A;border:none;border-radius:6px;' +
+      'padding:8px 18px;font-size:13px;font-weight:700;cursor:pointer">&#11015; Opslaan als PDF</button>' +
+      '<button onclick="window.close()" style="background:transparent;color:#fff;border:1px solid rgba(255,255,255,.4);' +
+      'border-radius:6px;padding:8px 14px;font-size:13px;cursor:pointer">Sluiten</button>' +
+      '</div>');
 
-    // 2. Bouw retourkaart HTML (zelfde als print)
-    var html = buildRetourHtml(k);
-    html = html.replace('<script>window.onload = function(){ window.print(); }<\/script>', '');
-
-    // 3. Extraheer styles en body
-    var styles = '';
-    html.replace(/<style[^>]*>([\s\S]*?)<\/style>/gi, function(_,css){ styles+=css; });
-    var bodyHtml = html.replace(/[\s\S]*<body[^>]*>/i,'').replace(/<\/body>[\s\S]*/i,'');
-
-    // 4. Maak een zichtbare overlay (html2canvas vereist zichtbare elementen)
-    var overlay = document.createElement('div');
-    overlay.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(255,255,255,0.95);z-index:99998;display:flex;align-items:flex-start;justify-content:center;overflow:auto';
-
-    var wrap = document.createElement('div');
-    wrap.style.cssText = 'width:794px;background:#fff;font-family:Helvetica Neue,Arial,sans-serif;font-size:12px;color:#111;box-sizing:border-box;margin:0 auto;padding:28px 32px';
-
-    var styleEl = document.createElement('style');
-    styleEl.textContent = styles;
-    wrap.appendChild(styleEl);
-
-    var bodyDiv = document.createElement('div');
-    bodyDiv.innerHTML = bodyHtml;
-    wrap.appendChild(bodyDiv);
-
-    overlay.appendChild(wrap);
-    document.body.appendChild(overlay);
-
-    // 5. Logo laden en bewaren als canvas
-    var logoCanvas = null;
-    var tmpImg = new Image();
-    tmpImg.src = VERPA_LOGO_B64;
-    await new Promise(function(res){ tmpImg.onload=res; tmpImg.onerror=res; });
-    logoCanvas = document.createElement('canvas');
-    logoCanvas.width  = tmpImg.naturalWidth;
-    logoCanvas.height = tmpImg.naturalHeight;
-    logoCanvas.getContext('2d').drawImage(tmpImg, 0, 0);
-
-    // Logo injecteren in wrap EN via onclone voor html2canvas clone
-    function injectLogo(root) {
-      var el = root.querySelector('#verpa-logo-placeholder');
-      if (!el || !logoCanvas) return;
-      var c = document.createElement('canvas');
-      c.width  = logoCanvas.width;
-      c.height = logoCanvas.height;
-      c.style.cssText = 'display:block;height:36px;width:auto';
-      c.getContext('2d').drawImage(logoCanvas, 0, 0);
-      el.innerHTML = '';
-      el.appendChild(c);
-    }
-    injectLogo(wrap);
-
-    // 6. Wacht op render
-    await new Promise(function(r){ setTimeout(r, 500); });
-
-    // 7. html2canvas
-    var canvas = await html2canvas(wrap, {
-      scale: 2,
-      useCORS: false,
-      allowTaint: true,
-      backgroundColor: '#ffffff',
-      width: 794,
-      windowWidth: 794,
-      logging: false,
-      onclone: function(clonedDoc) {
-        injectLogo(clonedDoc);
-      }
-    });
-
-    document.body.removeChild(overlay);
-
-    // 8. Canvas → PDF
-    var imgData = canvas.toDataURL('image/jpeg', 0.97);
-    var jsPDFLib = window.jspdf.jsPDF;
-    var pdf = new jsPDFLib({ orientation:'portrait', unit:'mm', format:'a4' });
-    var pdfW = pdf.internal.pageSize.getWidth();
-    var pdfH = pdf.internal.pageSize.getHeight();
-    var imgH = (canvas.height * pdfW) / canvas.width;
-
-    if (imgH <= pdfH) {
-      pdf.addImage(imgData,'JPEG',0,0,pdfW,imgH);
-    } else {
-      var pageCanvas = document.createElement('canvas');
-      var pageHpx = Math.round(canvas.width * pdfH / pdfW);
-      pageCanvas.width = canvas.width;
-      pageCanvas.height = pageHpx;
-      var ctx = pageCanvas.getContext('2d');
-      var pages = Math.ceil(canvas.height / pageHpx);
-      for (var p=0; p<pages; p++) {
-        ctx.fillStyle='#fff'; ctx.fillRect(0,0,pageCanvas.width,pageHpx);
-        ctx.drawImage(canvas,0,-p*pageHpx);
-        if (p>0) pdf.addPage();
-        pdf.addImage(pageCanvas.toDataURL('image/jpeg',0.97),'JPEG',0,0,pdfW,pdfH);
-      }
-    }
-
-    pdf.save('Retourkaart_'+k.Dossiernummer+'.pdf');
-    showToast('PDF gedownload.', 'success');
-
-  } catch(err) {
-    console.error('PDF fout:', err);
-    // Cleanup overlay indien aanwezig
-    var ol = document.querySelector('div[style*="z-index:99998"]');
-    if (ol) document.body.removeChild(ol);
-    showToast('PDF genereren mislukt: '+err.message, 'error');
-  } finally {
-    if(btn){ btn.disabled=false; btn.innerHTML=origHtml; }
-  }
+  var win = window.open('', '_blank');
+  if (!win) { showToast('Sta pop-ups toe voor verpa-klachten.pages.dev.', 'error'); return; }
+  win.document.open();
+  win.document.write(html);
+  win.document.close();
 }
