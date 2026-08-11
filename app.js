@@ -2727,34 +2727,30 @@ async function downloadRetourPdf(itemId) {
     document.body.appendChild(wrap);
 
     // Vervang logo-placeholder door een inline canvas-element
-    wrap.querySelectorAll('#verpa-logo-placeholder').forEach(function(el) {
-      el.innerHTML = ''; // verwijder de <img> (CORS-probleem in html2canvas)
-      var logoCanvas = document.createElement('canvas');
-      logoCanvas.width  = 220;
-      logoCanvas.height = 50;
-      var ctx = logoCanvas.getContext('2d');
-      // Achtergrond
-      ctx.fillStyle = '#1B3F6A';
-      ctx.roundRect(0, 0, 220, 50, 6);
-      ctx.fill();
-      // Oranje cirkel
-      ctx.fillStyle = '#f37a2b';
-      ctx.beginPath();
-      ctx.arc(25, 25, 18, 0, Math.PI * 2);
-      ctx.fill();
-      // Witte "p" in cirkel
-      ctx.fillStyle = '#ffffff';
-      ctx.font = '900 22px Arial Black, Arial, sans-serif';
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.fillText('p', 25, 26);
-      // "VERPA" tekst
-      ctx.font = '800 22px Helvetica Neue, Arial, sans-serif';
-      ctx.letterSpacing = '3px';
-      ctx.fillText('VERPA', 138, 26);
-      logoCanvas.style.cssText = 'display:block;height:36px;width:auto';
-      el.appendChild(logoCanvas);
-    });
+    // Laad het echte logo van zelfde domein (geen CORS) en teken op canvas
+    var logoEl = wrap.querySelector('#verpa-logo-placeholder');
+    if (logoEl) {
+      try {
+        var logoB64 = await fetch('/logo.png')
+          .then(function(r){ return r.blob(); })
+          .then(function(blob){ return new Promise(function(res){
+            var fr = new FileReader(); fr.onload = function(e){ res(e.target.result); }; fr.readAsDataURL(blob);
+          }); });
+
+        var logoImg = new Image();
+        await new Promise(function(res, rej){ logoImg.onload=res; logoImg.onerror=rej; logoImg.src=logoB64; });
+
+        var logoCanvas = document.createElement('canvas');
+        logoCanvas.width  = logoImg.naturalWidth;
+        logoCanvas.height = logoImg.naturalHeight;
+        logoCanvas.getContext('2d').drawImage(logoImg, 0, 0);
+        logoCanvas.style.cssText = 'display:block;height:36px;width:auto';
+        logoEl.innerHTML = '';
+        logoEl.appendChild(logoCanvas);
+      } catch(e) {
+        console.warn('Logo laden mislukt:', e.message);
+      }
+    }
 
     // Wacht op render
     await new Promise(function(r){ setTimeout(r, 400); });
