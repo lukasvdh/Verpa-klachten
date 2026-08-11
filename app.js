@@ -2706,9 +2706,10 @@ async function downloadRetourPdf(itemId) {
 
     var wrap = document.createElement('div');
     wrap.style.cssText = [
-      'position:fixed','left:-9999px','top:0',
+      'position:absolute','left:0','top:0',
       'width:794px','min-height:1px',
-      'background:#fff','z-index:99999',
+      'background:#fff','z-index:-9999',
+      'opacity:0','pointer-events:none',
       'font-family:Helvetica Neue,Arial,sans-serif',
       'font-size:12px','color:#111',
       'padding:28px 32px','box-sizing:border-box'
@@ -2728,6 +2729,7 @@ async function downloadRetourPdf(itemId) {
 
     // Logo op canvas tekenen (html2canvas rendert canvas-in-canvas altijd correct)
     var logoEl = wrap.querySelector('#verpa-logo-placeholder');
+    console.log('[PDF] logoEl gevonden:', !!logoEl, '| VERPA_LOGO_B64 len:', VERPA_LOGO_B64 ? VERPA_LOGO_B64.length : 0);
     if (logoEl) {
       var tmpImg = new Image();
       tmpImg.src = VERPA_LOGO_B64;
