@@ -2678,187 +2678,122 @@ async function downloadRetourPdf(itemId) {
   if (btn) { btn.disabled = true; btn.innerHTML = 'Laden&#8230;'; }
 
   try {
-    // Laad jsPDF
-    if (!window.jspdf) {
-      await new Promise(function(res,rej){
-        var s=document.createElement('script');
-        s.src='https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
-        s.onload=res; s.onerror=rej; document.head.appendChild(s);
+    // 1. Laad html2canvas + jsPDF
+    async function loadScript(src) {
+      if (document.querySelector('script[src="'+src+'"]')) return;
+      return new Promise(function(res,rej){
+        var s=document.createElement('script'); s.src=src; s.onload=res; s.onerror=rej; document.head.appendChild(s);
       });
     }
+    await loadScript('https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js');
+    await loadScript('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js');
 
+    // 2. Bouw retourkaart HTML (zelfde als print)
+    var html = buildRetourHtml(k);
+    html = html.replace('<script>window.onload = function(){ window.print(); }<\/script>', '');
+
+    // 3. Extraheer styles en body
+    var styles = '';
+    html.replace(/<style[^>]*>([\s\S]*?)<\/style>/gi, function(_,css){ styles+=css; });
+    var bodyHtml = html.replace(/[\s\S]*<body[^>]*>/i,'').replace(/<\/body>[\s\S]*/i,'');
+
+    // 4. Maak een zichtbare overlay (html2canvas vereist zichtbare elementen)
+    var overlay = document.createElement('div');
+    overlay.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(255,255,255,0.95);z-index:99998;display:flex;align-items:flex-start;justify-content:center;overflow:auto';
+
+    var wrap = document.createElement('div');
+    wrap.style.cssText = 'width:794px;background:#fff;font-family:Helvetica Neue,Arial,sans-serif;font-size:12px;color:#111;box-sizing:border-box;margin:20px auto';
+
+    var styleEl = document.createElement('style');
+    styleEl.textContent = styles;
+    wrap.appendChild(styleEl);
+
+    var bodyDiv = document.createElement('div');
+    bodyDiv.innerHTML = bodyHtml;
+    wrap.appendChild(bodyDiv);
+
+    overlay.appendChild(wrap);
+    document.body.appendChild(overlay);
+
+    // 5. Logo als canvas injecteren (geen CORS probleem)
+    var logoEl = wrap.querySelector('#verpa-logo-placeholder');
+    if (logoEl) {
+      var tmpImg = new Image();
+      tmpImg.src = VERPA_LOGO_B64;
+      await new Promise(function(res){ tmpImg.onload=res; tmpImg.onerror=res; });
+      var lC = document.createElement('canvas');
+      var lH = tmpImg.naturalHeight; var lW = tmpImg.naturalWidth;
+      lC.width=lW; lC.height=lH;
+      lC.getContext('2d').drawImage(tmpImg,0,0);
+      lC.style.cssText = 'display:block;height:36px;width:auto';
+      logoEl.innerHTML = '';
+      logoEl.appendChild(lC);
+    }
+
+    // 6. Wacht op render
+    await new Promise(function(r){ setTimeout(r, 600); });
+
+    // 7. html2canvas op wrap (zichtbaar element = geen problemen)
+    var canvas = await html2canvas(wrap, {
+      scale: 2,
+      useCORS: true,
+      allowTaint: true,
+      backgroundColor: '#ffffff',
+      width: 794,
+      windowWidth: 794,
+      logging: false,
+      onclone: function(clonedDoc) {
+        // Zorg dat logo canvas ook in clone zit
+        var cloneLogoEl = clonedDoc.querySelector('#verpa-logo-placeholder');
+        if (cloneLogoEl && logoEl) {
+          var cloneLc = document.createElement('canvas');
+          var src = logoEl.querySelector('canvas');
+          if (src) {
+            cloneLc.width = src.width; cloneLc.height = src.height;
+            cloneLc.style.cssText = src.style.cssText;
+            cloneLc.getContext('2d').drawImage(src,0,0);
+            cloneLogoEl.innerHTML = '';
+            cloneLogoEl.appendChild(cloneLc);
+          }
+        }
+      }
+    });
+
+    document.body.removeChild(overlay);
+
+    // 8. Canvas → PDF
+    var imgData = canvas.toDataURL('image/jpeg', 0.97);
     var jsPDFLib = window.jspdf.jsPDF;
     var pdf = new jsPDFLib({ orientation:'portrait', unit:'mm', format:'a4' });
-    var pW = pdf.internal.pageSize.getWidth();   // 210mm
-    var pH = pdf.internal.pageSize.getHeight();  // 297mm
-    var margin = 10;
-    var cW = pW - 2*margin;
-    var y = margin;
+    var pdfW = pdf.internal.pageSize.getWidth();
+    var pdfH = pdf.internal.pageSize.getHeight();
+    var imgH = (canvas.height * pdfW) / canvas.width;
 
-    // Helper: tekst toevoegen
-    function txt(text, x, fy, size, style, color) {
-      pdf.setFontSize(size||11);
-      pdf.setFont('helvetica', style||'normal');
-      pdf.setTextColor.apply(pdf, color||[17,17,17]);
-      pdf.text(String(text||''), x, fy);
+    if (imgH <= pdfH) {
+      pdf.addImage(imgData,'JPEG',0,0,pdfW,imgH);
+    } else {
+      var pageCanvas = document.createElement('canvas');
+      var pageHpx = Math.round(canvas.width * pdfH / pdfW);
+      pageCanvas.width = canvas.width;
+      pageCanvas.height = pageHpx;
+      var ctx = pageCanvas.getContext('2d');
+      var pages = Math.ceil(canvas.height / pageHpx);
+      for (var p=0; p<pages; p++) {
+        ctx.fillStyle='#fff'; ctx.fillRect(0,0,pageCanvas.width,pageHpx);
+        ctx.drawImage(canvas,0,-p*pageHpx);
+        if (p>0) pdf.addPage();
+        pdf.addImage(pageCanvas.toDataURL('image/jpeg',0.97),'JPEG',0,0,pdfW,pdfH);
+      }
     }
-
-    // Helper: rechthoek
-    function rect(x,ry,w,h,fill,r) {
-      if(fill){ pdf.setFillColor.apply(pdf,fill); }
-      if(r){ pdf.roundedRect(x,ry,w,h,r,r,fill?'F':'S'); }
-      else { pdf.rect(x,ry,w,h,fill?'F':'S'); }
-    }
-
-    // ── LOGO BLOK ──────────────────────────────────────────────
-    // Navy achtergrond
-    rect(margin, y, 60, 14, [27,63,106], 2);
-
-    // Logo afbeelding op navy blok
-    var logoImg = new Image();
-    logoImg.src = VERPA_LOGO_B64;
-    await new Promise(function(res){ logoImg.onload=res; logoImg.onerror=res; });
-    var lC = document.createElement('canvas');
-    var lH = 10; var lW = Math.round(logoImg.naturalWidth * lH / logoImg.naturalHeight);
-    lC.width=lW*4; lC.height=lH*4;
-    lC.getContext('2d').drawImage(logoImg,0,0,lC.width,lC.height);
-    pdf.addImage(lC.toDataURL('image/png'), 'PNG', margin+2, y+2, lW, lH);
-
-    // Dossiernummer rechts
-    rect(pW-margin-32, y, 32, 10, [27,63,106], 2);
-    txt(k.Dossiernummer, pW-margin-30, y+7, 11, 'bold', [255,255,255]);
-
-    // Datum
-    txt('Opgemaakt op '+new Date().toLocaleDateString('nl-BE'), pW-margin-32, y+14, 8, 'normal', [100,116,139]);
-
-    y += 18;
-    txt('Verkoop Retour Verzending', margin, y, 9, 'normal', [100,116,139]);
-    y += 2;
-
-    // Lijn
-    pdf.setDrawColor(27,63,106); pdf.setLineWidth(0.5);
-    pdf.line(margin, y+2, pW-margin, y+2);
-    y += 7;
-
-    // ── KLANTGEGEVENS ──────────────────────────────────────────
-    txt('KLANTGEGEVENS', margin, y, 7.5, 'bold', [148,163,184]);
-    y += 5;
-
-    var col2 = margin + cW*0.45;
-    var fields = [
-      ['KLANTNAAM', k.Klantnaam,       'KLANTNUMMER',   k.Klantnummer],
-      ['FACTUURNUMMER', k.Factuurnummer, 'DATUM MELDING', k.DatumMelding ? new Date(k.DatumMelding).toLocaleDateString('nl-BE') : ''],
-      ['TYPE KLACHT', k.TypeKlacht,    'INGEDIEND DOOR', k.MelderNaam||k.Melder],
-    ];
-    fields.forEach(function(row) {
-      txt(row[0], margin, y, 7.5, 'bold', [148,163,184]);
-      txt(row[2], col2,   y, 7.5, 'bold', [148,163,184]);
-      y += 4;
-      txt(row[1], margin, y, 10, 'bold', [15,23,42]);
-      txt(row[3], col2,   y, 10, 'bold', [15,23,42]);
-      y += 6;
-    });
-
-    // Retouradres
-    if (k.Straat||k.straat) {
-      var ax = margin + cW*0.72;
-      var aTop = y - 22;
-      rect(ax, aTop, pW-margin-ax, 22, null, 2);
-      pdf.setDrawColor(226,232,240); pdf.setLineWidth(0.3);
-      pdf.roundedRect(ax, aTop, pW-margin-ax, 22, 2, 2, 'S');
-      txt('RETOURADRES KLANT', ax+3, aTop+5, 7, 'bold', [148,163,184]);
-      txt(k.Klantnaam,  ax+3, aTop+10, 9, 'bold', [15,23,42]);
-      txt(k.Straat||k.straat||'', ax+3, aTop+15, 9, 'normal', [15,23,42]);
-      txt(((k.Postcode||k.postcode||'')+' '+(k.Gemeente||k.gemeente||'')).trim(), ax+3, aTop+20, 9, 'normal', [15,23,42]);
-    }
-
-    y += 2;
-    // ── ARTIKELEN ──────────────────────────────────────────────
-    txt('TE RETOURNEREN ARTIKELEN', margin, y, 7.5, 'bold', [148,163,184]);
-    y += 4;
-
-    // Header
-    rect(margin, y, cW, 8, [27,63,106]);
-    pdf.setTextColor(255,255,255); pdf.setFontSize(7.5); pdf.setFont('helvetica','bold');
-    var cols = [{l:'ARTIKELNR.',x:margin+2,w:22},{l:'ARTIKELNAAM',x:margin+26,w:70},
-                {l:'UOM',x:margin+98,w:14,r:true},{l:'AANTAL',x:margin+114,w:16,r:true},
-                {l:'PRIJS/ST.',x:margin+132,w:20,r:true},{l:'TOTAAL',x:margin+154,w:22,r:true}];
-    cols.forEach(function(c){
-      pdf.text(c.l, c.r ? c.x+c.w : c.x, y+5.5, c.r?{align:'right'}:{});
-    });
-    y += 8;
-
-    var artikelregels = [];
-    try{ artikelregels = JSON.parse(k.Artikelregels||'[]').filter(function(r){return r.artnr||r.naam;}); }catch(e){}
-    var totaal = 0;
-    artikelregels.forEach(function(r,i){
-      var a=parseFloat(r.aantal)||0; var p=parseFloat(String(r.prijs||0).replace(',','.'))||0;
-      var lijn=a*p; totaal+=lijn;
-      if(i%2===1){ rect(margin,y,cW,7,[248,250,252]); }
-      pdf.setTextColor(17,17,17); pdf.setFontSize(9); pdf.setFont('helvetica','normal');
-      pdf.text(String(r.artnr||'-'), margin+2, y+5);
-      pdf.text(String(r.naam||'-').substring(0,45), margin+26, y+5);
-      pdf.text(String(r.uom||'ST'), margin+98+14, y+5, {align:'right'});
-      pdf.text(String(a), margin+114+16, y+5, {align:'right'});
-      pdf.text('€ '+p.toLocaleString('nl-BE',{minimumFractionDigits:2,maximumFractionDigits:2}), margin+132+20, y+5, {align:'right'});
-      pdf.text('€ '+lijn.toLocaleString('nl-BE',{minimumFractionDigits:2,maximumFractionDigits:2}), margin+154+22, y+5, {align:'right'});
-      y+=7;
-    });
-
-    // Totaal
-    pdf.setDrawColor(27,63,106); pdf.setLineWidth(0.5);
-    pdf.line(margin, y, pW-margin, y);
-    y+=5;
-    txt('Totaal (excl. BTW)', pW-margin-50, y, 10, 'bold', [15,23,42]);
-    txt('€ '+totaal.toLocaleString('nl-BE',{minimumFractionDigits:2,maximumFractionDigits:2}), pW-margin, y, 10, 'bold', [27,63,106]);
-    y+=10;
-
-    // ── HANDTEKENINGEN + QR ─────────────────────────────────────
-    var boxH = 35;
-    pdf.setDrawColor(203,213,225); pdf.setLineWidth(0.4);
-    pdf.setLineDash([2,2]);
-    pdf.roundedRect(margin, y, cW*0.48, boxH, 2, 2, 'S');
-    pdf.roundedRect(margin+cW*0.5, y, cW*0.3, boxH, 2, 2, 'S');
-    pdf.setLineDash([]);
-
-    txt('HANDTEKENING KLANT VOOR ONTVANGST RETOUR', margin+2, y+5, 6.5, 'bold', [148,163,184]);
-    txt('HANDTEKENING CHAUFFEUR', margin+cW*0.5+2, y+5, 6.5, 'bold', [148,163,184]);
-
-    // Naam/datum lijnen
-    pdf.setDrawColor(100,116,139); pdf.setLineWidth(0.3);
-    pdf.line(margin+5, y+boxH-8, margin+cW*0.3, y+boxH-8);
-    pdf.line(margin+cW*0.34, y+boxH-8, margin+cW*0.46, y+boxH-8);
-    pdf.line(margin+cW*0.5+5, y+boxH-8, margin+cW*0.79, y+boxH-8);
-    txt('Naam:', margin+2, y+boxH-4, 8, 'normal', [100,116,139]);
-    txt('Datum:', margin+cW*0.32, y+boxH-4, 8, 'normal', [100,116,139]);
-    txt('Naam:', margin+cW*0.5+2, y+boxH-4, 8, 'normal', [100,116,139]);
-
-    // QR code
-    var qrX = margin+cW*0.82; var qrS = 30;
-    var qrUrl = 'https://api.qrserver.com/v1/create-qr-code/?size=200x200&data='+encodeURIComponent('https://verpa-klachten.pages.dev/?dossier='+k.Dossiernummer);
-    try {
-      var qrBlob = await fetch(qrUrl).then(function(r){return r.blob();});
-      var qrB64  = await new Promise(function(res){var fr=new FileReader();fr.onload=function(e){res(e.target.result);};fr.readAsDataURL(qrBlob);});
-      pdf.addImage(qrB64,'PNG',qrX,y,qrS,qrS);
-    } catch(e){}
-    txt('Scan voor dossier', qrX, y+qrS+4, 6.5, 'normal', [148,163,184]);
-    txt(k.Dossiernummer,    qrX, y+qrS+8, 6.5, 'bold',   [148,163,184]);
-
-    y += boxH + 8;
-
-    // ── FOOTER ──────────────────────────────────────────────────
-    pdf.setDrawColor(226,232,240); pdf.setLineWidth(0.3);
-    pdf.line(margin, y, pW-margin, y);
-    y+=4;
-    txt('Verpa Benelux NV  ·  www.verpa.be  ·  Dossier '+k.Dossiernummer, pW/2, y, 8, 'normal', [148,163,184]);
-    pdf.setFontSize(8); pdf.setFont('helvetica','normal');
-    pdf.internal.getTextDimensions && pdf.text('Verpa Benelux NV  ·  www.verpa.be  ·  Dossier '+k.Dossiernummer, pW/2, y, {align:'center'});
 
     pdf.save('Retourkaart_'+k.Dossiernummer+'.pdf');
     showToast('PDF gedownload.', 'success');
 
   } catch(err) {
     console.error('PDF fout:', err);
+    // Cleanup overlay indien aanwezig
+    var ol = document.querySelector('div[style*="z-index:99998"]');
+    if (ol) document.body.removeChild(ol);
     showToast('PDF genereren mislukt: '+err.message, 'error');
   } finally {
     if(btn){ btn.disabled=false; btn.innerHTML=origHtml; }
