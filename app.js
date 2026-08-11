@@ -2215,7 +2215,7 @@ function buildRetourHtml(k) {
   <div class="header">
     <div class="header-left">
       <div style="background:#1B3F6A;border-radius:8px;padding:4px 12px;display:inline-flex;align-items:center;margin-bottom:6px;height:52px">
-        <div style="height:36px;width:180px;background-image:url('${VERPA_LOGO_B64}');background-repeat:no-repeat;background-size:contain;background-position:center left"></div>
+        <div id="verpa-logo-placeholder" style="height:36px;width:180px"><img src="${VERPA_LOGO_URL}" alt="Verpa" style="height:36px;display:block"/></div>
       </div>
       <div class="sub">Verkoop Retour Verzending</div>
     </div>
@@ -2548,7 +2548,7 @@ function printRetour(itemId) {
   <div class="header">
     <div class="header-left">
       <div style="background:#1B3F6A;border-radius:8px;padding:4px 12px;display:inline-flex;align-items:center;margin-bottom:6px;height:52px">
-        <div style="height:36px;width:180px;background-image:url('${VERPA_LOGO_B64}');background-repeat:no-repeat;background-size:contain;background-position:center left"></div>
+        <div id="verpa-logo-placeholder" style="height:36px;width:180px"><img src="${VERPA_LOGO_URL}" alt="Verpa" style="height:36px;display:block"/></div>
       </div>
       <div class="sub">Verkoop Retour Verzending</div>
     </div>
@@ -2726,9 +2726,9 @@ async function downloadRetourPdf(itemId) {
 
     document.body.appendChild(wrap);
 
-    // Vervang alle logo-placeholders door een inline canvas-element
-    wrap.querySelectorAll('div[style*="background-image"]').forEach(function(el) {
-      if (!el.style.backgroundImage.includes('VERPA') && !el.style.backgroundImage.includes('base64') && !el.style.backgroundImage.includes('svg')) return;
+    // Vervang logo-placeholder door een inline canvas-element
+    wrap.querySelectorAll('#verpa-logo-placeholder').forEach(function(el) {
+      el.innerHTML = ''; // verwijder de <img> (CORS-probleem in html2canvas)
       var logoCanvas = document.createElement('canvas');
       logoCanvas.width  = 220;
       logoCanvas.height = 50;
@@ -2753,8 +2753,6 @@ async function downloadRetourPdf(itemId) {
       ctx.letterSpacing = '3px';
       ctx.fillText('VERPA', 138, 26);
       logoCanvas.style.cssText = 'display:block;height:36px;width:auto';
-      el.style.backgroundImage = 'none';
-      el.style.background = 'transparent';
       el.appendChild(logoCanvas);
     });
 
