@@ -2215,7 +2215,7 @@ function buildRetourHtml(k) {
   <div class="header">
     <div class="header-left">
       <div style="background:#1B3F6A;border-radius:8px;padding:4px 12px;display:inline-flex;align-items:center;margin-bottom:6px;height:52px">
-        <div id="verpa-logo-placeholder" style="height:36px;width:180px"><img src="${VERPA_LOGO_B64}" alt="Verpa" style="height:36px;display:block"/></div>
+        <div id="verpa-logo-placeholder" style="height:36px;width:180px;background:#1B3F6A;display:flex;align-items:center;padding:0 8px"><canvas id="verpa-logo-canvas" style="height:36px;display:block"></canvas></div>
       </div>
       <div class="sub">Verkoop Retour Verzending</div>
     </div>
@@ -2520,8 +2520,31 @@ function _retourOpenVenster(itemId, autoPrint) {
   if (!win) { showToast('Sta pop-ups toe voor deze site om de retourkaart te openen.', 'error'); return; }
   win.document.write(html);
   win.document.close();
+
+  // Logo op canvas tekenen na laden (geen CORS, zelfde origin via document.write)
+  function drawLogoInWindow(targetWin) {
+    var logoCanvas = targetWin.document.getElementById('verpa-logo-canvas');
+    if (!logoCanvas || !VERPA_LOGO_B64) return;
+    var img = new Image();
+    img.onload = function() {
+      var h = logoCanvas.offsetHeight || 36;
+      var w = Math.round(img.naturalWidth * h / img.naturalHeight);
+      logoCanvas.width = w * 2;
+      logoCanvas.height = h * 2;
+      logoCanvas.style.height = h + 'px';
+      logoCanvas.style.width = w + 'px';
+      logoCanvas.getContext('2d').drawImage(img, 0, 0, logoCanvas.width, logoCanvas.height);
+    };
+    img.src = VERPA_LOGO_B64;
+  }
+
   if (autoPrint) {
-    win.onload = function() { win.focus(); win.print(); };
+    win.onload = function() {
+      drawLogoInWindow(win);
+      setTimeout(function() { win.focus(); win.print(); }, 600);
+    };
+  } else {
+    win.onload = function() { drawLogoInWindow(win); };
   }
 }
 
