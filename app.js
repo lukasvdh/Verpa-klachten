@@ -454,17 +454,49 @@ async function spDeleteItem(itemId) {
   if (!r.ok && r.status !== 204) throw new Error(`DELETE ${r.status}`);
 }
 
+/* ── Kolomnamen cache: haalt echte interne namen op van SharePoint ── */
+let _spColumnMap = null;
+async function getSpColumnMap() {
+  if (_spColumnMap) return _spColumnMap;
+  const siteId = await getSiteId();
+  const listId = await getListId();
+  const tok    = await refreshToken();
+  const r = await fetch(
+    `https://graph.microsoft.com/v1.0/sites/${siteId}/lists/${listId}/columns?$top=200`,
+    { headers: { Authorization: `Bearer ${tok}` } }
+  );
+  if (!r.ok) { console.warn('Kon kolommen niet ophalen'); return {}; }
+  const data = await r.json();
+  const map = {};
+  (data.value || []).forEach(function(col) {
+    map[col.displayName] = col.name;    // displayName → interne naam
+    map[col.name]        = col.name;    // interne naam → zichzelf
+  });
+  console.log('📋 SharePoint kolomnamen (display → intern):', map);
+  _spColumnMap = map;
+  return map;
+}
+
 async function spUpdateItem(itemId, fields) {
   const siteId = await getSiteId();
   const listId = await getListId();
   const tok    = await refreshToken();
 
-  console.log('spUpdateItem →', { itemId, fields: JSON.stringify(fields) });
+  // Vertaal veldnamen naar SharePoint interne namen
+  const colMap = await getSpColumnMap();
+  const mappedFields = {};
+  for (const key in fields) {
+    const realName = colMap[key] || key;
+    if (realName !== key) console.log('🔄 Veldnaam vertaald:', key, '→', realName);
+    mappedFields[realName] = fields[key];
+  }
+
+  console.log('spUpdateItem →', { itemId, original: JSON.stringify(fields), mapped: JSON.stringify(mappedFields) });
 
   const r = await fetch(`https://graph.microsoft.com/v1.0/sites/${siteId}/lists/${listId}/items/${itemId}/fields`, {
     method: 'PATCH',
     headers: { Authorization: `Bearer ${tok}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify(fields),
+    body: JSON.stringify(mappedFields),
   });
   if (!r.ok) {
     const e = await r.text();
@@ -472,7 +504,7 @@ async function spUpdateItem(itemId, fields) {
       status: r.status,
       statusText: r.statusText,
       itemId: itemId,
-      fieldsSent: JSON.stringify(fields),
+      fieldsSent: JSON.stringify(mappedFields),
       sharePointResponse: e
     });
     throw new Error('SharePoint PATCH fout (' + r.status + '): ' + e);
