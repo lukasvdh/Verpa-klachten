@@ -459,12 +459,24 @@ async function spUpdateItem(itemId, fields) {
   const listId = await getListId();
   const tok    = await refreshToken();
 
+  console.log('spUpdateItem →', { itemId, fields: JSON.stringify(fields) });
+
   const r = await fetch(`https://graph.microsoft.com/v1.0/sites/${siteId}/lists/${listId}/items/${itemId}/fields`, {
     method: 'PATCH',
     headers: { Authorization: `Bearer ${tok}`, 'Content-Type': 'application/json' },
     body: JSON.stringify(fields),
   });
-  if (!r.ok) { const e = await r.text(); throw new Error(e); }
+  if (!r.ok) {
+    const e = await r.text();
+    console.error('❌ spUpdateItem FOUT:', {
+      status: r.status,
+      statusText: r.statusText,
+      itemId: itemId,
+      fieldsSent: JSON.stringify(fields),
+      sharePointResponse: e
+    });
+    throw new Error('SharePoint PATCH fout (' + r.status + '): ' + e);
+  }
   return r.json();
 }
 
@@ -1617,9 +1629,31 @@ async function updateBehandelStatus(itemId, nieuweStatus, btnEl) {
   if (statusNaarGeklasseerd)  spFields.Status = 'Geklasseerd';
 
   try {
+    console.log('updateBehandelStatus → spFields:', JSON.stringify(spFields));
     await spUpdateItem(itemId, spFields);
   } catch (e) {
+    console.error('updateBehandelStatus fout details:', e.message);
     showToast('SharePoint fout: ' + e.message, 'error');
+    // Probeer opnieuw ZONDER Status veld als dat het probleem is
+    if (statusNaarGeklasseerd) {
+      console.warn('Retry zonder Status veld...');
+      try {
+        const retryFields = { BehandelStatus: nieuweStatus };
+        if (datumAfhandeling) retryFields.DatumAfhandeling = datumAfhandeling;
+        await spUpdateItem(itemId, retryFields);
+        showToast('BehandelStatus opgeslagen (Status apart bijwerken)', 'warning');
+        // Probeer Status apart
+        try {
+          await spUpdateItem(itemId, { Status: 'Geklasseerd' });
+          showToast('Status bijgewerkt naar Geklasseerd', 'success');
+        } catch (e2) {
+          console.error('Status apart updaten mislukt:', e2.message);
+          showToast('Status kon niet naar Geklasseerd: ' + e2.message, 'error');
+        }
+      } catch (e3) {
+        showToast('Ook retry mislukt: ' + e3.message, 'error');
+      }
+    }
     return;
   }
 
