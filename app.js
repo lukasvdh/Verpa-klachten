@@ -94,6 +94,10 @@ async function sendNotificatiemail(klacht) {
               <td style="padding:8px 0;font-size:14px">${esc(klacht.factuurnummer)}</td>
             </tr>
             <tr>
+              <td style="padding:8px 0;font-size:13px;color:#64748b">Interne fout</td>
+              <td style="padding:8px 0;font-size:14px">${klacht.interneFout ? '<span style="color:#92400e;font-weight:700">Ja</span>' : 'Nee'}</td>
+            </tr>
+            <tr>
               <td style="padding:8px 0;font-size:13px;color:#64748b">Type klacht</td>
               <td style="padding:8px 0;font-size:14px">${esc(klacht.typeKlacht)}</td>
             </tr>
@@ -613,7 +617,7 @@ function renderList(){
           +artBadge+cnBadge
         +'</div>'
       +'</div>'
-      +'<div class="melding-right"><span class="melding-bedrag">\u20ac '+formatBedrag(k.Bedrag)+'</span>'+sb+behandelStatusBadge(k.BehandelStatus)+'</div>'
+      +'<div class="melding-right">'+(k.InterneFout?'<span style="display:inline-block;background:#fef3c7;color:#92400e;font-size:10px;font-weight:700;padding:2px 7px;border-radius:8px;margin-right:4px">Intern</span>':'')+'<span class="melding-bedrag">\u20ac '+formatBedrag(k.Bedrag)+'</span>'+sb+behandelStatusBadge(k.BehandelStatus)+'</div>'
       +'</div>';
   }).join('');
 }
@@ -662,7 +666,7 @@ async function loadReview() {
           <div class="meta-item"><span class="meta-label">Klantnr</span><span class="meta-value">${esc(item.Klantnummer)}</span></div>
           <div class="meta-item"><span class="meta-label">Factuurnr</span><span class="meta-value">${esc(item.Factuurnummer)}</span></div>
           <div class="meta-item"><span class="meta-label">Type</span><span class="meta-value">${esc(item.TypeKlacht)}</span></div>
-          <div class="meta-item"><span class="meta-label">Bedrag</span><span class="meta-value" style="color:var(--brand);font-weight:700">€ ${formatBedrag(item.Bedrag)}</span></div>
+          <div class="meta-item"><span class="meta-label">Bedrag</span><span class="meta-value" style="color:var(--brand);font-weight:700">€ ${formatBedrag(item.Bedrag)}</span></div>${item.InterneFout ? '<div class="meta-item"><span class="meta-label">Intern</span><span class="meta-value" style="color:#92400e;font-weight:700">Ja</span></div>' : ''}
           <div class="meta-item"><span class="meta-label">Ingediend door</span><span class="meta-value">${esc(item.MelderNaam || item.Melder || '–')}</span></div>
         </div>
         <div class="review-desc">${esc(item.Omschrijving)}</div>
@@ -778,7 +782,7 @@ function openDetail(id){
   } else if(k.Bedrag){artHtml='<div style="margin-bottom:16px"><div class="d-lbl" style="margin-bottom:4px">Bedrag (excl. BTW)</div><div class="d-val big">\u20ac '+fmtB(k.Bedrag)+'</div></div>';}
   var rejectHtml=k.WeigeringReden?'<div class="reject-box"><div class="d-lbl">Reden weigering</div><div class="d-val" style="font-weight:400;margin-top:4px">'+k.WeigeringReden+'</div></div>':'';
   var cnHtml=k.CreditnotaNr?'<div><div class="d-lbl">Creditnota</div><div class="d-val" style="font-family:monospace;font-weight:700;color:var(--green)">'+k.CreditnotaNr+'</div></div>':'';
-  document.getElementById('modalBody').innerHTML='<div class="detail-grid"><div><div class="d-lbl">Dossiernummer</div><div class="d-val" style="font-family:monospace;font-size:15px;font-weight:700;color:var(--navy)">'+k.Dossiernummer+'</div></div><div><div class="d-lbl">Goedkeuringsstatus</div><div class="d-val">'+statusBadge(k.Status)+'</div></div><div class="d-full"><div class="d-lbl">Behandelstatus</div><div class="behandel-seg" id="behandelSeg">'+['Nieuw','In behandeling','Afgehandeld'].map(function(s){var cur=k.BehandelStatus||'Nieuw';var cls='behandel-seg-btn bs-btn-'+s.replace(/ /g,'-').toLowerCase()+(cur===s?' active':'');return'<button class="'+cls+'" onclick="updateBehandelStatus(\''+k.id+'\',\''+s+'\',this)"><span class="seg-dot"></span>'+s+'</button>';}).join('')+'</div></div><div><div class="d-lbl">Datum melding</div><div class="d-val">'+fmtDate(k.DatumMelding)+'</div></div><div><div class="d-lbl">Type klacht</div><div class="d-val">'+(typePill[k.TypeKlacht]||k.TypeKlacht)+'</div></div><div><div class="d-lbl">Klantnaam</div><div class="d-val">'+k.Klantnaam+'</div></div><div><div class="d-lbl">Klantnummer</div><div class="d-val">'+k.Klantnummer+'</div></div><div><div class="d-lbl">Factuurnummer</div><div class="d-val">'+k.Factuurnummer+'</div></div>'+(k.BeoordeeldDoor?'<div><div class="d-lbl">Beoordeeld door</div><div class="d-val">'+k.BeoordeeldDoor+'</div></div>':'')+'<div><div class="d-lbl">Datum afhandeling</div><div class="d-val" id="datumAfhandelingVal">'+(k.DatumAfhandeling?new Date(k.DatumAfhandeling).toLocaleDateString('nl-BE'):'\u2013')+'</div></div>'+cnHtml+'<div class="d-full"><div class="d-lbl">Omschrijving</div><div class="d-val desc">'+k.Omschrijving+'</div></div><div><div class="d-lbl">Ingediend door</div><div class="d-val">'+(k.MelderNaam||'\u2013')+'</div></div></div>'+artHtml+rejectHtml;
+  document.getElementById('modalBody').innerHTML='<div class="detail-grid"><div><div class="d-lbl">Dossiernummer</div><div class="d-val" style="font-family:monospace;font-size:15px;font-weight:700;color:var(--navy)">'+k.Dossiernummer+'</div></div><div><div class="d-lbl">Goedkeuringsstatus</div><div class="d-val">'+statusBadge(k.Status)+'</div></div><div class="d-full"><div class="d-lbl">Behandelstatus</div><div class="behandel-seg" id="behandelSeg">'+['Nieuw','In behandeling','Afgehandeld'].map(function(s){var cur=k.BehandelStatus||'Nieuw';var cls='behandel-seg-btn bs-btn-'+s.replace(/ /g,'-').toLowerCase()+(cur===s?' active':'');return'<button class="'+cls+'" onclick="updateBehandelStatus(\''+k.id+'\',\''+s+'\',this)"><span class="seg-dot"></span>'+s+'</button>';}).join('')+'</div></div><div><div class="d-lbl">Datum melding</div><div class="d-val">'+fmtDate(k.DatumMelding)+'</div></div><div><div class="d-lbl">Type klacht</div><div class="d-val">'+(typePill[k.TypeKlacht]||k.TypeKlacht)+'</div></div><div><div class="d-lbl">Klantnaam</div><div class="d-val">'+k.Klantnaam+'</div></div><div><div class="d-lbl">Klantnummer</div><div class="d-val">'+k.Klantnummer+'</div></div><div><div class="d-lbl">Factuurnummer</div><div class="d-val">'+k.Factuurnummer+'</div></div><div><div class="d-lbl">Interne fout</div><div class="d-val"><label style="display:flex;align-items:center;gap:8px;cursor:pointer"><input type="checkbox" id="detailInterneFout" '+(k.InterneFout?'checked':'')+' onchange="updateInterneFout(\''+k.id+'\',this.checked)" style="width:16px;height:16px;accent-color:var(--navy);cursor:pointer" /> '+(k.InterneFout?'Ja':'Nee')+'</label></div></div>'+(k.BeoordeeldDoor?'<div><div class="d-lbl">Beoordeeld door</div><div class="d-val">'+k.BeoordeeldDoor+'</div></div>':'')+'<div><div class="d-lbl">Datum afhandeling</div><div class="d-val" id="datumAfhandelingVal">'+(k.DatumAfhandeling?new Date(k.DatumAfhandeling).toLocaleDateString('nl-BE'):'\u2013')+'</div></div>'+cnHtml+'<div class="d-full"><div class="d-lbl">Omschrijving</div><div class="d-val desc">'+k.Omschrijving+'</div></div><div><div class="d-lbl">Ingediend door</div><div class="d-val">'+(k.MelderNaam||'\u2013')+'</div></div></div>'+artHtml+rejectHtml;
   var foot=document.getElementById('modalFooter');
   var retourBtn='<button onclick="printRetour(\''+k.id+'\')" style="display:inline-flex;align-items:center;gap:6px;padding:7px 14px;border-radius:8px;border:1.5px solid #1B3F6A;cursor:pointer;font-size:13px;font-weight:600;background:#fff;color:#1B3F6A;white-space:nowrap">&#128424; Afdrukken</button>'+'<button onclick="downloadRetourPdf(\''+k.id+'\')" style="display:inline-flex;align-items:center;gap:6px;padding:7px 14px;border-radius:8px;border:none;cursor:pointer;font-size:13px;font-weight:600;background:#1B3F6A;color:#fff;white-space:nowrap">&#11015; Download PDF</button>';
   var delBtn=currentUser.isAdmin?'<button class="btn btn-danger" style="margin-left:auto" onclick="deleteKlacht(\''+k.id+'\',\''+k.Dossiernummer+'\')" title="Verwijderen">&#128465; Verwijderen</button>':'';
@@ -1285,6 +1289,8 @@ function resetForm() {
     if (el) { el.value = ''; el.classList.remove('invalid'); }
   });
   document.getElementById('fType').value = '';
+  const fInterneFout = document.getElementById('fInterneFout');
+  if (fInterneFout) fInterneFout.checked = false;
   selectedFiles = [];
   renderFileList();
   // Reset artikelregels
@@ -1484,6 +1490,8 @@ async function submitKlacht() {
   // Bereken totaalbedrag uit artikelregels
   const bedrag = artikelregels.reduce((sum, r) => sum + (r.aantal * r.prijs), 0);
 
+  const isInterneFout = document.getElementById('fInterneFout')?.checked || false;
+
   const fields = {
     Klantnaam:    basicFields.Klantnaam.val,
     Klantnummer:  basicFields.Klantnummer.val,
@@ -1494,6 +1502,7 @@ async function submitKlacht() {
     Straat:       document.getElementById('fStraat')?.value.trim() || '',
     Postcode:     document.getElementById('fPostcode')?.value.trim() || '',
     Gemeente:     document.getElementById('fGemeente')?.value.trim() || '',
+    InterneFout:  isInterneFout,
   };
 
   const btn = document.getElementById('btnSubmit');
@@ -1531,6 +1540,7 @@ async function submitKlacht() {
       bedrag:       fields.Bedrag,
       melder:       currentUser.email,
       melderNaam:   currentUser.name,
+      interneFout:  isInterneFout,
       artikelregels,
     });
 
@@ -1579,9 +1589,14 @@ async function updateBehandelStatus(itemId, nieuweStatus, btnEl) {
   const oudeBehandelStatus = k ? (k.BehandelStatus || 'Nieuw') : 'Nieuw';
   const datumAfhandeling = nieuweStatus === 'Afgehandeld' ? new Date().toISOString() : null;
 
+  // Bij Afgehandeld → Status automatisch naar Geklasseerd
+  const oudeStatus = k ? (k.Status || '') : '';
+  const statusNaarGeklasseerd = nieuweStatus === 'Afgehandeld' && oudeStatus !== 'Geklasseerd';
+
   if (k) {
     k.BehandelStatus    = nieuweStatus;
     k.DatumAfhandeling  = datumAfhandeling;
+    if (statusNaarGeklasseerd) k.Status = 'Geklasseerd';
   }
 
   // Datum label in modal bijwerken zonder modal te sluiten
@@ -1594,6 +1609,7 @@ async function updateBehandelStatus(itemId, nieuweStatus, btnEl) {
   const spFields = { BehandelStatus: nieuweStatus };
   if (datumAfhandeling)       spFields.DatumAfhandeling = datumAfhandeling;
   else if (nieuweStatus !== 'Afgehandeld') spFields.DatumAfhandeling = null;
+  if (statusNaarGeklasseerd)  spFields.Status = 'Geklasseerd';
 
   try {
     await spUpdateItem(itemId, spFields);
@@ -1611,10 +1627,14 @@ async function updateBehandelStatus(itemId, nieuweStatus, btnEl) {
   showToast('Behandelstatus opgeslagen: ' + nieuweStatus, 'success');
 
   // 3. Wijzigingsmail naar melder – snapshot van k (al bijgewerkt)
+  const wijzigingen = [
+    { veld: 'Behandelstatus', oud: oudeBehandelStatus, nieuw: nieuweStatus },
+  ];
+  if (statusNaarGeklasseerd) {
+    wijzigingen.push({ veld: 'Status', oud: oudeStatus, nieuw: 'Geklasseerd' });
+  }
   if (k) {
-    await sendWijzigingsmailSnapshot({ ...k }, [
-      { veld: 'Behandelstatus', oud: oudeBehandelStatus, nieuw: nieuweStatus },
-    ]);
+    await sendWijzigingsmailSnapshot({ ...k }, wijzigingen);
   }
 }
 
@@ -1660,6 +1680,30 @@ async function bcPatchBehandelStatus(dossiernummer, nieuweStatus, datumAfhandeli
   }
 }
 
+/* ══════════════════ INTERNE FOUT TOGGLE ══════════════════ */
+async function updateInterneFout(itemId, checked) {
+  try {
+    const k = allKlachten.find(x => String(x.id) === String(itemId));
+    if (k) k.InterneFout = checked;
+    // Label bijwerken naast checkbox
+    const cb = document.getElementById('detailInterneFout');
+    if (cb) {
+      const lbl = cb.parentElement;
+      if (lbl) {
+        // Verwijder text node(s) en voeg juiste label toe
+        Array.from(lbl.childNodes).forEach(n => { if (n.nodeType === 3) n.remove(); });
+        lbl.appendChild(document.createTextNode(checked ? ' Ja' : ' Nee'));
+      }
+    }
+    await spUpdateItem(itemId, { InterneFout: checked });
+    showToast('Interne fout ' + (checked ? 'aangevinkt' : 'uitgevinkt'), 'success');
+    renderList();
+  } catch (e) {
+    console.error('updateInterneFout fout:', e);
+    showToast('Fout bij opslaan interne fout: ' + e.message, 'error');
+  }
+}
+
 /* ══════════════════ EXCEL EXPORT ══════════════════ */
 document.getElementById('btnExport').addEventListener('click', exportToExcel);
 
@@ -1682,6 +1726,7 @@ function exportToExcel() {
     'Beoordeeld door':  k.BeoordeeldDoor || '',
     'Datum beoordeling': k.DatumGoedkeuring ? formatDateExcel(k.DatumGoedkeuring) : '',
     'Reden weigering':  k.WeigeringReden || '',
+    'Interne Fout':     k.InterneFout ? 'Ja' : 'Nee',
   }));
 
   const ws = XLSX.utils.json_to_sheet(rows);
@@ -1742,8 +1787,8 @@ function setupImport() {
 
 function downloadImportTemplate() {
   const headers = ['Dossiernummer','DatumMelding','Klantnaam','Klantnummer','Factuurnummer',
-                   'TypeKlacht','Omschrijving','Bedrag','Status','Melder','MelderNaam'];
-  const ws = XLSX.utils.aoa_to_sheet([headers, ['2025-0001','15-06-2025','Voorbeeldbedrijf BV','K00001','F2025-001','Kwaliteit','Voorbeeld omschrijving',125.50,'Goedgekeurd','gebruiker@verpa.be','Jan Janssen']]);
+                   'TypeKlacht','Omschrijving','Bedrag','Status','Melder','MelderNaam','InterneFout'];
+  const ws = XLSX.utils.aoa_to_sheet([headers, ['2025-0001','15-06-2025','Voorbeeldbedrijf BV','K00001','F2025-001','Kwaliteit','Voorbeeld omschrijving',125.50,'Goedgekeurd','gebruiker@verpa.be','Jan Janssen','Nee']]);
   ws['!cols'] = headers.map(() => ({ wch: 22 }));
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, 'Import');
@@ -1832,6 +1877,7 @@ async function runImport() {
         Melder:        row.Melder || 'import@verpa',
         MelderNaam:    row.MelderNaam || 'Import',
         IsHistorisch:  true,
+        InterneFout:   String(row.InterneFout || '').toLowerCase() === 'ja' || String(row.InterneFout || '').toLowerCase() === 'true',
       });
       ok++;
     } catch {
@@ -2233,6 +2279,7 @@ function buildRetourHtml(k) {
         <div class="info-item"><label>Factuurnummer</label><span>${esc(k.Factuurnummer)}</span></div>
         <div class="info-item"><label>Datum melding</label><span>${datumFormatted}</span></div>
         <div class="info-item"><label>Type klacht</label><span class="type-pill">${esc(k.TypeKlacht)}</span></div>
+        <div class="info-item"><label>Interne fout</label><span>${k.InterneFout ? '<span style="color:#92400e;font-weight:700">Ja</span>' : 'Nee'}</span></div>
         <div class="info-item"><label>Ingediend door</label><span>${esc(k.MelderNaam||k.Melder)}</span></div>
       </div>
     </div>
@@ -2411,6 +2458,10 @@ async function sendWijzigingsmailSnapshot(k, wijzigingen) {
             <td style="padding:9px 14px;font-size:13px">${esc(k.Factuurnummer)}</td>
           </tr>
           <tr style="border-bottom:1px solid #f1f5f9">
+            <td style="padding:9px 14px;font-size:12px;color:#64748b">Interne fout</td>
+            <td style="padding:9px 14px;font-size:13px">${k.InterneFout ? '<span style="color:#92400e;font-weight:700">Ja</span>' : 'Nee'}</td>
+          </tr>
+          <tr style="border-bottom:1px solid #f1f5f9;background:#fafafa">
             <td style="padding:9px 14px;font-size:12px;color:#64748b">Type klacht</td>
             <td style="padding:9px 14px;font-size:13px">${esc(k.TypeKlacht)}</td>
           </tr>
