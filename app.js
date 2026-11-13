@@ -1649,14 +1649,25 @@ async function updateBehandelStatus(itemId, nieuweStatus, btnEl) {
   const oudeBehandelStatus = k ? (k.BehandelStatus || 'Nieuw') : 'Nieuw';
   const datumAfhandeling = nieuweStatus === 'Afgehandeld' ? new Date().toISOString() : null;
 
-  // Bij Afgehandeld → Status automatisch naar Geklasseerd
+  // Bij Afgehandeld → Status automatisch naar Geklasseerd (vorige status bewaren)
+  // Bij Nieuw → Status herstellen naar wat het was vóór Geklasseerd
   const oudeStatus = k ? (k.Status || '') : '';
   const statusNaarGeklasseerd = nieuweStatus === 'Afgehandeld' && oudeStatus !== 'Geklasseerd';
+  const statusResetten = nieuweStatus === 'Nieuw' && oudeStatus === 'Geklasseerd';
+  // Bepaal herstelstatus: gebruik opgeslagen _prevStatus, anders 'Goedgekeurd' als fallback
+  const herstelStatus = (statusResetten && k && k._prevStatus) ? k._prevStatus : 'Goedgekeurd';
 
   if (k) {
     k.BehandelStatus    = nieuweStatus;
     k.DatumAfhandeling  = datumAfhandeling;
-    if (statusNaarGeklasseerd) k.Status = 'Geklasseerd';
+    if (statusNaarGeklasseerd) {
+      k._prevStatus = oudeStatus;   // bewaar vorige status
+      k.Status = 'Geklasseerd';
+    }
+    if (statusResetten) {
+      k.Status = herstelStatus;
+      delete k._prevStatus;
+    }
   }
 
   // Datum label in modal bijwerken zonder modal te sluiten
@@ -1670,6 +1681,9 @@ async function updateBehandelStatus(itemId, nieuweStatus, btnEl) {
   if (datumAfhandeling)       spFields.DatumAfhandeling = datumAfhandeling;
   else if (nieuweStatus !== 'Afgehandeld') spFields.DatumAfhandeling = null;
   if (statusNaarGeklasseerd)  spFields.Status = 'Geklasseerd';
+  if (statusResetten) {
+    spFields.Status = herstelStatus;
+  }
 
   try {
     console.log('updateBehandelStatus → spFields:', JSON.stringify(spFields));
@@ -1694,6 +1708,9 @@ async function updateBehandelStatus(itemId, nieuweStatus, btnEl) {
   ];
   if (statusNaarGeklasseerd) {
     wijzigingen.push({ veld: 'Status', oud: oudeStatus, nieuw: 'Geklasseerd' });
+  }
+  if (statusResetten) {
+    wijzigingen.push({ veld: 'Status', oud: oudeStatus, nieuw: herstelStatus });
   }
   if (k) {
     await sendWijzigingsmailSnapshot({ ...k }, wijzigingen);
