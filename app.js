@@ -596,6 +596,8 @@ function renderList(){
   if(document.getElementById('cnt-open'))document.getElementById('cnt-open').textContent=cntOpen+' open';
   if(document.getElementById('cnt-hoog'))document.getElementById('cnt-hoog').textContent='0 hoog';
   if(document.getElementById('cnt-done'))document.getElementById('cnt-done').textContent=cntDone+' afgehandeld';
+  var cntIntern=allKlachten.filter(function(k){return k.InterneFout;}).length;
+  if(document.getElementById('cnt-intern'))document.getElementById('cnt-intern').textContent=cntIntern+' intern';
   const badge=document.getElementById('badgePending');
   if(badge){badge.textContent=cntOpen;badge.classList.toggle('hidden',cntOpen===0);}
   var el=document.getElementById('melding-list');
