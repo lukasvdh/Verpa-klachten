@@ -697,15 +697,18 @@ async function approveKlacht(itemId, fromReview = false) {
     const klachtSnapshot = { ...(allKlachten.find(x => x.id === itemId) || {}) };
     const oudStatus = klachtSnapshot.Status || '–';
 
+    const nuISO = new Date().toISOString();
     await spUpdateItem(itemId, {
       Status: 'Goedgekeurd',
-      DatumGoedkeuring: new Date().toISOString(),
+      DatumGoedkeuring: nuISO,
+      DatumAfhandeling: nuISO,
       BeoordeeldDoor: currentUser.email,
     });
 
     // Snapshot updaten met nieuwe waarden voor de mail
-    klachtSnapshot.Status        = 'Goedgekeurd';
-    klachtSnapshot.BeoordeeldDoor = currentUser.email;
+    klachtSnapshot.Status          = 'Goedgekeurd';
+    klachtSnapshot.DatumAfhandeling = nuISO;
+    klachtSnapshot.BeoordeeldDoor   = currentUser.email;
 
     showToast('Klacht goedgekeurd. Creditnota staat klaar.', 'success');
     closeModal();
