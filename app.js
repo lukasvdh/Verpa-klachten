@@ -482,13 +482,24 @@ async function spUpdateItem(itemId, fields) {
   const listId = await getListId();
   const tok    = await refreshToken();
 
-  // Vertaal veldnamen naar SharePoint interne namen
+  // Vertaal veldnamen naar SharePoint interne namen + filter onbekende kolommen
   const colMap = await getSpColumnMap();
+  const hasColMap = Object.keys(colMap).length > 0;
   const mappedFields = {};
+  const skippedFields = [];
   for (const key in fields) {
-    const realName = colMap[key] || key;
-    if (realName !== key) console.log('🔄 Veldnaam vertaald:', key, '→', realName);
-    mappedFields[realName] = fields[key];
+    const realName = colMap[key];
+    if (hasColMap && !realName) {
+      console.warn('⚠️ Kolom overgeslagen (bestaat niet in SharePoint):', key);
+      skippedFields.push(key);
+      continue;
+    }
+    const finalName = realName || key;
+    if (finalName !== key) console.log('🔄 Veldnaam vertaald:', key, '→', finalName);
+    mappedFields[finalName] = fields[key];
+  }
+  if (skippedFields.length) {
+    console.warn('⚠️ Deze kolommen bestaan niet in SharePoint en zijn overgeslagen:', skippedFields.join(', '));
   }
 
   console.log('spUpdateItem →', { itemId, original: JSON.stringify(fields), mapped: JSON.stringify(mappedFields) });
@@ -1666,26 +1677,6 @@ async function updateBehandelStatus(itemId, nieuweStatus, btnEl) {
   } catch (e) {
     console.error('updateBehandelStatus fout details:', e.message);
     showToast('SharePoint fout: ' + e.message, 'error');
-    // Probeer opnieuw ZONDER Status veld als dat het probleem is
-    if (statusNaarGeklasseerd) {
-      console.warn('Retry zonder Status veld...');
-      try {
-        const retryFields = { BehandelStatus: nieuweStatus };
-        if (datumAfhandeling) retryFields.DatumAfhandeling = datumAfhandeling;
-        await spUpdateItem(itemId, retryFields);
-        showToast('BehandelStatus opgeslagen (Status apart bijwerken)', 'warning');
-        // Probeer Status apart
-        try {
-          await spUpdateItem(itemId, { Status: 'Geklasseerd' });
-          showToast('Status bijgewerkt naar Geklasseerd', 'success');
-        } catch (e2) {
-          console.error('Status apart updaten mislukt:', e2.message);
-          showToast('Status kon niet naar Geklasseerd: ' + e2.message, 'error');
-        }
-      } catch (e3) {
-        showToast('Ook retry mislukt: ' + e3.message, 'error');
-      }
-    }
     return;
   }
 
